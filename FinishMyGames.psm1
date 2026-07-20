@@ -19,7 +19,7 @@ function Get-Cfg {
             Backlog   = "To Play (plan to play)"   # intend to play
             Hold      = "To Play (on hold)"        # paused, still a candidate
             Shelf     = "Playing (on shelf)"       # active shelf (max = cap)
-            Evergreen = "Playing (fil rouge)"      # created by this add-on
+            Evergreen = "Playing (evergreen)"      # always good to play (created by this add-on)
             Abandoned = "Played (abandoned)"       # won't return
             Finished  = "Played (completed)"       # got what I wanted
             Beaten    = "Played (beaten)"          # 100% / end boss down
@@ -37,6 +37,22 @@ function Get-Cfg {
             SLong     = "[Session] 🕰️ Long"
             Marker    = "[Session] __AUTO__"
         }
+        # --- Filter presets: Name + which statuses/tags to filter, by KEY from
+        #     Status/Tags above. Add / remove / rename freely. Several tags = OR;
+        #     several statuses = OR. Keys must exist in Status/Tags.
+        Presets = @(
+            @{ Name = "Focus";      Tags = @("Focus") },
+            @{ Name = "Hype";       Tags = @("Hype") },
+            @{ Name = "Evening";    Status = @("Shelf") },
+            @{ Name = "30 min";     Status = @("Shelf"); Tags = @("SShort") },
+            @{ Name = "1h";         Status = @("Shelf"); Tags = @("SShort","SMedium") },
+            @{ Name = "Action";     Status = @("Shelf"); Tags = @("Action") },
+            @{ Name = "Adventure";  Status = @("Shelf"); Tags = @("Adventure") },
+            @{ Name = "Chill";      Status = @("Shelf"); Tags = @("Light","Simple") },
+            @{ Name = "Backlog";    Status = @("Backlog","Hold") },
+            @{ Name = "Unfinished"; Status = @("Hold") },
+            @{ Name = "Evergreen";  Status = @("Evergreen") }
+        )
     }
 }
 
@@ -249,90 +265,44 @@ function Invoke-CreatePresets {
     param($actionArgs)
     $c = Get-Cfg
 
-    $shelf = Find-Status $c.Status.Shelf
-    $ever  = Resolve-Status $c.Status.Evergreen
-    $plan  = Find-Status $c.Status.Backlog
-    $hold  = Find-Status $c.Status.Hold
-
-    if ($null -eq $shelf) {
+    if ($null -eq (Find-Status $c.Status.Shelf)) {
         $PlayniteApi.Dialogs.ShowMessage("Status '$($c.Status.Shelf)' not found. Fix the name in Get-Cfg or in Playnite first.", "Finish My Games")
         return
     }
 
-    $focus  = Resolve-Tag $c.Tags.Focus
-    $hype   = Resolve-Tag $c.Tags.Hype
-    $short  = Resolve-Tag $c.Tags.SShort
-    $medium = Resolve-Tag $c.Tags.SMedium
-    $action = Resolve-Tag $c.Tags.Action
-    $advent = Resolve-Tag $c.Tags.Adventure
-    $light  = Resolve-Tag $c.Tags.Light
-    $simple = Resolve-Tag $c.Tags.Simple
-
     $created = @()
+    $skipped = @()
 
-    $s = New-Object Playnite.SDK.Models.FilterPresetSettings
-    $s.Tag = New-IdFilter @($focus.Id)
-    [void](Resolve-Preset "Focus" $s); $created += "Focus"
+    foreach ($p in $c.Presets) {
+        $settings = New-Object Playnite.SDK.Models.FilterPresetSettings
+        $hasFilter = $false
 
-    $s = New-Object Playnite.SDK.Models.FilterPresetSettings
-    $s.Tag = New-IdFilter @($hype.Id)
-    [void](Resolve-Preset "Hype" $s); $created += "Hype"
+        if ($p.ContainsKey("Status") -and @($p.Status).Count -gt 0) {
+            $sids = @()
+            foreach ($k in $p.Status) { $st = Find-Status $c.Status[$k]; if ($st) { $sids += $st.Id } }
+            if ($sids.Count -gt 0) { $settings.CompletionStatuses = New-IdFilter $sids; $hasFilter = $true }
+        }
 
-    $s = New-Object Playnite.SDK.Models.FilterPresetSettings
-    $s.CompletionStatuses = New-IdFilter @($shelf.Id)
-    [void](Resolve-Preset "Evening" $s); $created += "Evening"
+        if ($p.ContainsKey("Tags") -and @($p.Tags).Count -gt 0) {
+            $tids = @()
+            foreach ($k in $p.Tags) { $nm = $c.Tags[$k]; if ($nm) { $tg = Resolve-Tag $nm; $tids += $tg.Id } }
+            if ($tids.Count -gt 0) { $settings.Tag = New-IdFilter $tids; $hasFilter = $true }
+        }
 
-    $s = New-Object Playnite.SDK.Models.FilterPresetSettings
-    $s.CompletionStatuses = New-IdFilter @($shelf.Id)
-    $s.Tag = New-IdFilter @($short.Id)
-    [void](Resolve-Preset "30 min" $s); $created += "30 min"
-
-    $s = New-Object Playnite.SDK.Models.FilterPresetSettings
-    $s.CompletionStatuses = New-IdFilter @($shelf.Id)
-    $s.Tag = New-IdFilter @($short.Id, $medium.Id)
-    [void](Resolve-Preset "1h" $s); $created += "1h"
-
-    $s = New-Object Playnite.SDK.Models.FilterPresetSettings
-    $s.CompletionStatuses = New-IdFilter @($shelf.Id)
-    $s.Tag = New-IdFilter @($action.Id)
-    [void](Resolve-Preset "Action" $s); $created += "Action"
-
-    $s = New-Object Playnite.SDK.Models.FilterPresetSettings
-    $s.CompletionStatuses = New-IdFilter @($shelf.Id)
-    $s.Tag = New-IdFilter @($advent.Id)
-    [void](Resolve-Preset "Adventure" $s); $created += "Adventure"
-
-    $s = New-Object Playnite.SDK.Models.FilterPresetSettings
-    $s.CompletionStatuses = New-IdFilter @($shelf.Id)
-    $s.Tag = New-IdFilter @($light.Id, $simple.Id)
-    [void](Resolve-Preset "Chill" $s); $created += "Chill"
-
-    # Backlog = Plan to Play + On Hold (candidates you intend / paused).
-    $backlogIds = @()
-    if ($plan) { $backlogIds += $plan.Id }
-    if ($hold) { $backlogIds += $hold.Id }
-    if ($backlogIds.Count -gt 0) {
-        $s = New-Object Playnite.SDK.Models.FilterPresetSettings
-        $s.CompletionStatuses = New-IdFilter $backlogIds
-        [void](Resolve-Preset "Backlog" $s); $created += "Backlog"
+        if ($hasFilter) { [void](Resolve-Preset $p.Name $settings); $created += $p.Name }
+        else { $skipped += $p.Name }
     }
 
-    $s = New-Object Playnite.SDK.Models.FilterPresetSettings
-    $s.CompletionStatuses = New-IdFilter @($ever.Id)
-    [void](Resolve-Preset "Fil rouge" $s); $created += "Fil rouge"
-
-    $PlayniteApi.Dialogs.ShowMessage(
-        "Presets created (or already present):`n  " + ($created -join "`n  ") +
-        "`n`nStill to create by hand (date / playtime filters, ~20s each):`n" +
-        "  Recently added = Date added: last month`n" +
-        "  Unfinished     = backlog + Time played > 0`n`n" +
-        "Pin the ones you use most.",
-        "Finish My Games - presets"
-    )
+    $msg = "Presets created (or already present):`n  " + ($created -join "`n  ")
+    if ($skipped.Count -gt 0) {
+        $msg += "`n`nSkipped (no matching status/tag - check the keys in Get-Cfg.Presets):`n  " + ($skipped -join ", ")
+    }
+    $msg += "`n`nStill to create by hand (date filter, ~20s):`n  Recently added = Date added: last month`n`nPin the ones you use most."
+    $PlayniteApi.Dialogs.ShowMessage($msg, "Finish My Games - presets")
 }
 
 # ---------------------------------------------------------------------------
-#  3) Seed Session tags from genres (draft). Only games without any Session/*.
+#  3) Seed Session tags from genres (draft). Only games with no Session tag yet.
 # ---------------------------------------------------------------------------
 
 function Invoke-SeedSession {
@@ -352,9 +322,18 @@ function Invoke-SeedSession {
     [void](Resolve-Tag $map.Default)
     $marker = Resolve-Tag $c.Tags.Marker
 
+    # Set of "already has a Session tag" ids - robust to any tag naming scheme.
+    $sessionIds = New-Object 'System.Collections.Generic.HashSet[Guid]'
+    foreach ($b in $map.Buckets) { $bt = Find-Tag $b.Tag; if ($bt) { [void]$sessionIds.Add($bt.Id) } }
+    $dt = Find-Tag $map.Default; if ($dt) { [void]$sessionIds.Add($dt.Id) }
+    foreach ($nm in @($c.Tags.SShort, $c.Tags.SMedium, $c.Tags.SLong)) { $ct = Find-Tag $nm; if ($ct) { [void]$sessionIds.Add($ct.Id) } }
+    [void]$sessionIds.Add($marker.Id)
+
     $touched = 0
     foreach ($game in $PlayniteApi.Database.Games) {
-        if (Test-GameHasTagLike $game "Session/*") { continue }
+        $already = $false
+        if ($null -ne $game.TagIds) { foreach ($tid in $game.TagIds) { if ($sessionIds.Contains($tid)) { $already = $true; break } } }
+        if ($already) { continue }
 
         $genreNames = @()
         if ($null -ne $game.GenreIds) {

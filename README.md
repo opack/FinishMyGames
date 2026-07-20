@@ -30,6 +30,7 @@ Tout s'appuie sur les champs natifs de Playnite :
 ### `Get-Cfg`
 
 Tous les noms (statuts + tags) sont centralisés dans la fonction **`Get-Cfg`** en haut du `.psm1`. **C'est le seul endroit à éditer** si on renomme un statut ou un tag dans Playnite. Les statuts sont en ASCII (éditables sans risque) ; les tags contiennent des emojis (préserver le BOM).
+Les presets sont également définis dans cette section.
 Cette modification nécessite le redémarrage de Playnite.
 
 ### `session-map.txt`
