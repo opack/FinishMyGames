@@ -1,0 +1,6 @@
+# Preserve exact bytes: the PowerShell module needs its UTF-8 BOM and CRLF,
+# and the data files must not be EOL-normalized.
+FinishMyGames.psm1 -text
+session-map.txt   -text
+extension.yaml    -text
+config.txt        -text
