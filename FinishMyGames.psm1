@@ -26,8 +26,6 @@ function Get-Cfg {
         }
         # --- Tags (emojis OK; file is UTF-8 BOM).
         Tags = @{
-            Focus     = "🎯 Focus"
-            Hype      = "🔥 Hype"
             Action    = "[Mood] 💥 Action"
             Adventure = "[Mood] 🗺️ Adventure"
             Simple    = "[Mood] 🍬 Simple"
@@ -48,8 +46,7 @@ function Get-Cfg {
         #       SortDir = "Ascending" or "Descending"
         #     (applied only when the preset is first created; delete an existing one to refresh it)
         Presets = @(
-            @{ Name = "Focus";      Tags = @("Focus") },
-            @{ Name = "Hype";       Tags = @("Hype") },
+            @{ Name = "Shelf";      Status = @("Shelf"); Sort = "LastActivity"; SortDir = "Descending" },
             @{ Name = "Evening";    Status = @("Shelf","Evergreen"); Group = "CompletionStatus" },
             @{ Name = "30 min";     Status = @("Shelf","Evergreen"); Tags = @("SShort"); Group = "CompletionStatus" },
             @{ Name = "1h";         Status = @("Shelf","Evergreen"); Tags = @("SShort","SMedium"); Group = "CompletionStatus" },
@@ -247,8 +244,7 @@ function Invoke-CreateStructure {
 
     $tags = @(
         $c.Tags.Action, $c.Tags.Adventure, $c.Tags.Simple, $c.Tags.Light,
-        $c.Tags.SShort, $c.Tags.SMedium, $c.Tags.SLong,
-        $c.Tags.Hype, $c.Tags.Focus
+        $c.Tags.SShort, $c.Tags.SMedium, $c.Tags.SLong
     )
     foreach ($t in $tags) { [void](Resolve-Tag $t) }
 
@@ -414,9 +410,8 @@ function Invoke-SetShelfCap {
 
 # ===========================================================================
 #  WORKFLOW - right-click a game -> Finish My Games
-#  Only the two actions that do MORE than a plain status change:
+#  The one right-click action that does MORE than a plain status change:
 #    - Put on shelf : enforces the shelf cap
-#    - Set as Focus : moves the single Focus tag off the previous game
 #  Everything else is just a Completion Status change -> use Playnite directly.
 # ===========================================================================
 
@@ -425,8 +420,7 @@ function GetGameMenuItems {
 
     $section = "Finish My Games"
     $defs = @(
-        @{ D = "Put on shelf (respects the cap)"; F = "Invoke-SetShelf" },
-        @{ D = "Set as Focus";                    F = "Invoke-SetFocus" }
+        @{ D = "Put on shelf (respects the cap)"; F = "Invoke-SetShelf" }
     )
 
     $items = @()
@@ -464,31 +458,4 @@ function Invoke-SetShelf {
     if ($added -gt 0) {
         $PlayniteApi.Dialogs.ShowMessage("$added game(s) put on the shelf. Shelf: $count/$cap.", "Shelf")
     }
-}
-
-function Invoke-SetFocus {
-    param($actionArgs)
-    $c = Get-Cfg
-    $games = @($actionArgs.Games)
-    if ($games.Count -ne 1) {
-        $PlayniteApi.Dialogs.ShowMessage("Select a single game to set as Focus.", "Focus")
-        return
-    }
-    $g = $games[0]
-    $cap = Get-Cap
-    $shelf = Find-Status $c.Status.Shelf
-
-    if ($null -ne $shelf -and $g.CompletionStatusId -ne $shelf.Id) {
-        if ((Get-ShelfCount) -ge $cap) {
-            $PlayniteApi.Dialogs.ShowMessage("Shelf full ($cap). Free a slot before setting a new focus.", "Shelf full")
-            return
-        }
-        [void](Set-GameStatus $g $c.Status.Shelf)
-    }
-
-    [void](Resolve-Tag $c.Tags.Focus)
-    Remove-TagEverywhere $c.Tags.Focus
-    $focusTag = Find-Tag $c.Tags.Focus
-    Add-GameTags $g @($focusTag.Id)
-    $PlayniteApi.Dialogs.ShowMessage("'$($g.Name)' is your new Focus.", "Focus")
 }
