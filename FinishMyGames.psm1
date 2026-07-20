@@ -40,17 +40,23 @@ function Get-Cfg {
         # --- Filter presets: Name + which statuses/tags to filter, by KEY from
         #     Status/Tags above. Add / remove / rename freely. Several tags = OR;
         #     several statuses = OR. Keys must exist in Status/Tags.
+        #     Optional per preset: Group / Sort / SortDir to auto-group & sort the view.
+        #       Group   = a GroupableField name (CompletionStatus, Genre, Platform, PlayTime, Source, Added...)
+        #                 full list: https://api.playnite.link/docs/api/Playnite.SDK.Models.GroupableField.html
+        #       Sort    = a SortOrder name (Playtime, Name, Added, LastActivity, CompletionStatus...)
+        #                 full list: https://api.playnite.link/docs/api/Playnite.SDK.Models.SortOrder.html
+        #       SortDir = "Ascending" or "Descending"
+        #     (applied only when the preset is first created; delete an existing one to refresh it)
         Presets = @(
             @{ Name = "Focus";      Tags = @("Focus") },
             @{ Name = "Hype";       Tags = @("Hype") },
-            @{ Name = "Evening";    Status = @("Shelf") },
-            @{ Name = "30 min";     Status = @("Shelf"); Tags = @("SShort") },
-            @{ Name = "1h";         Status = @("Shelf"); Tags = @("SShort","SMedium") },
-            @{ Name = "Action";     Status = @("Shelf"); Tags = @("Action") },
-            @{ Name = "Adventure";  Status = @("Shelf"); Tags = @("Adventure") },
-            @{ Name = "Chill";      Status = @("Shelf"); Tags = @("Light","Simple") },
-            @{ Name = "Backlog";    Status = @("Backlog","Hold") },
-            @{ Name = "Unfinished"; Status = @("Hold") },
+            @{ Name = "Evening";    Status = @("Shelf","Evergreen"); Group = "CompletionStatus" },
+            @{ Name = "30 min";     Status = @("Shelf","Evergreen"); Tags = @("SShort"); Group = "CompletionStatus" },
+            @{ Name = "1h";         Status = @("Shelf","Evergreen"); Tags = @("SShort","SMedium"); Group = "CompletionStatus" },
+            @{ Name = "Action";     Status = @("Shelf","Evergreen"); Tags = @("Action"); Group = "CompletionStatus" },
+            @{ Name = "Adventure";  Status = @("Shelf","Evergreen"); Tags = @("Adventure"); Group = "CompletionStatus" },
+            @{ Name = "Chill";      Status = @("Shelf","Evergreen"); Tags = @("Light","Simple"); Group = "CompletionStatus" },
+            @{ Name = "Backlog";    Status = @("Backlog","Hold"); Group = "CompletionStatus"; Sort = "Playtime"; SortDir = "Descending" },
             @{ Name = "Evergreen";  Status = @("Evergreen") }
         )
     }
@@ -113,13 +119,16 @@ function New-IdFilter {
 }
 
 function Resolve-Preset {
-    param([string]$Name, $Settings)
+    param([string]$Name, $Settings, $Group, $Sort, $SortDir)
     $existing = $PlayniteApi.Database.FilterPresets | Where-Object { $_.Name -eq $Name } | Select-Object -First 1
     if ($null -ne $existing) { return $existing }
     $preset = New-Object Playnite.SDK.Models.FilterPreset
     $preset.Name = $Name
     $preset.Settings = $Settings
     $preset.ShowInFullscreeQuickSelection = $true
+    if ($Group)   { $preset.GroupingOrder         = [Playnite.SDK.Models.GroupableField]$Group }
+    if ($Sort)    { $preset.SortingOrder          = [Playnite.SDK.Models.SortOrder]$Sort }
+    if ($SortDir) { $preset.SortingOrderDirection = [Playnite.SDK.Models.SortOrderDirection]$SortDir }
     $PlayniteApi.Database.FilterPresets.Add($preset)
     return $preset
 }
@@ -208,7 +217,7 @@ function GetMainMenuItems {
 
     $section = "@|Finish My Games"
     $defs = @(
-        @{ D = "1) Create tags + 'Fil rouge' status";        F = "Invoke-CreateStructure" },
+        @{ D = "1) Create tags + 'Evergreen' status";        F = "Invoke-CreateStructure" },
         @{ D = "2) Create filter presets";                   F = "Invoke-CreatePresets" },
         @{ D = "3) Seed Session tags from genres (draft)";   F = "Invoke-SeedSession" },
         @{ D = "4) Count the active shelf";                  F = "Invoke-CountShelf" },
@@ -227,7 +236,7 @@ function GetMainMenuItems {
 }
 
 # ---------------------------------------------------------------------------
-#  1) Structure: mood/session tags + the 'fil rouge' status
+#  1) Structure: mood/session tags + the 'evergreen' status
 # ---------------------------------------------------------------------------
 
 function Invoke-CreateStructure {
@@ -289,7 +298,7 @@ function Invoke-CreatePresets {
             if ($tids.Count -gt 0) { $settings.Tag = New-IdFilter $tids; $hasFilter = $true }
         }
 
-        if ($hasFilter) { [void](Resolve-Preset $p.Name $settings); $created += $p.Name }
+        if ($hasFilter) { [void](Resolve-Preset $p.Name $settings $p.Group $p.Sort $p.SortDir); $created += $p.Name }
         else { $skipped += $p.Name }
     }
 
