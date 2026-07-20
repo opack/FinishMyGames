@@ -11,8 +11,8 @@
 # - Keep this file UTF-8. Lines starting with # and blank lines are ignored.
 # ---------------------------------------------------------------------------
 
-DEFAULT = Session/Medium ⏳
+DEFAULT = [Session] ⏳ Medium
 
-Session/Long 🕰️ = Role-Playing (RPG), RPG, Role-playing (RPG), Strategy, Real Time Strategy (RTS), Turn-based strategy (TBS), Grand Strategy, 4X, Simulator, Simulation, Massively Multiplayer, MMO, Visual Novel
+[Session] 🕰️ Long = Role-Playing (RPG), RPG, Role-playing (RPG), Strategy, Real Time Strategy (RTS), Turn-based strategy (TBS), Grand Strategy, 4X, Simulator, Simulation, Massively Multiplayer, MMO, Visual Novel
 
-Session/Short ⚡ = Shoot 'Em Up, Arcade, Fighting, Beat 'em up, Card & Board Game, Board Games, Puzzle, Sports, Racing, Pinball, Music, Rhythm, Party
+[Session] ⚡ Short = Shoot 'Em Up, Arcade, Fighting, Beat 'em up, Card & Board Game, Board Games, Puzzle, Sports, Racing, Pinball, Music, Rhythm, Party

@@ -28,14 +28,14 @@ function Get-Cfg {
         Tags = @{
             Focus     = "🎯 Focus"
             Hype      = "🔥 Hype"
-            Action    = "Mood/Action 💥"
-            Adventure = "Mood/Adventure 🗺️"
-            Simple    = "Mood/Simple 🍬"
-            Light     = "Mood/Light 🎈"
-            SShort    = "Session/Short ⚡"
-            SMedium   = "Session/Medium ⏳"
-            SLong     = "Session/Long 🕰️"
-            Marker    = "Session/__AUTO__"
+            Action    = "[Mood] 💥 Action"
+            Adventure = "[Mood] 🗺️ Adventure"
+            Simple    = "[Mood] 🍬 Simple"
+            Light     = "[Mood] 🎈 Light"
+            SShort    = "[Session] ⚡ Short"
+            SMedium   = "[Session] ⏳ Medium"
+            SLong     = "[Session] 🕰️ Long"
+            Marker    = "[Session] __AUTO__"
         }
     }
 }
@@ -237,7 +237,7 @@ function Invoke-CreateStructure {
         $msg += "`n`nWARNING - these statuses (from Get-Cfg) were NOT found in Playnite:`n  " + ($missing -join ", ") +
                 "`nRename them in Playnite to match, or fix the names in Get-Cfg."
     }
-    $msg += "`n`nNext: tag your games with Mood/... yourself, and run action 3 for a Session draft."
+    $msg += "`n`nNext: tag your games with \"[Mood] ...\" yourself, and run action 3 for a Session draft."
     $PlayniteApi.Dialogs.ShowMessage($msg, "Finish My Games - structure")
 }
 
