@@ -12,28 +12,31 @@
 function Get-Cfg {
     return @{
         # --- Completion statuses: MUST match your Playnite names EXACTLY.
-        #     Kanban columns: "To Play" / "Playing" / "Played".
+        #     Colonnes Kanban : "À jouer" / "En cours" / "Joué".
         #     Rename a status in Playnite? Update the matching line here.
         Status = @{
-            NotYet    = "To Play (not played)"     # brand new, unsorted
-            Backlog   = "To Play (plan to play)"   # intend to play
-            Hold      = "To Play (on hold)"        # paused, still a candidate
-            Shelf     = "Playing (on shelf)"       # active shelf (max = cap)
-            Evergreen = "Playing (evergreen)"      # always good to play (created by this add-on)
-            Abandoned = "Played (abandoned)"       # won't return
-            Finished  = "Played (completed)"       # got what I wanted
-            Beaten    = "Played (beaten)"          # 100% / end boss down
+            NotYet    = "À jouer (non débuté)"     # tout neuf, pas encore trié
+            Backlog   = "À jouer (backlog)"          # intention d'y jouer
+            Hold      = "À jouer (en pause)"       # en pause, toujours candidat
+            Shelf     = "En cours (sur l'étagère)"       # étagère active (plafond = cap)
+            Evergreen = "En cours (evergreen)"     # toujours bon à jouer (créé par cette extension)
+            Abandoned = "Joué (abandonné)"         # n'y reviendra pas
+            Finished  = "Joué (fini)"              # j'ai eu ce que je voulais
+            Beaten    = "Joué (terminé)"           # 100% / boss de fin battu
         }
         # --- Tags (emojis OK; file is UTF-8 BOM).
         Tags = @{
-            Action    = "[Mood] 💥 Action"
-            Adventure = "[Mood] 🗺️ Adventure"
-            Simple    = "[Mood] 🍬 Simple"
-            Light     = "[Mood] 🎈 Light"
-            SShort    = "[Session] ⚡ Short"
-            SMedium   = "[Session] ⏳ Medium"
-            SLong     = "[Session] 🕰️ Long"
-            Marker    = "[Session] __AUTO__"
+            Action     = "[Mood] 💥 Action"
+            Aventure   = "[Mood] 🗺️ Aventure"
+            Gestion    = "[Mood] 🏗️ Gestion"
+            Reflexion  = "[Mood] 🧩 Réflexion"
+            Detente    = "[Mood] 🍃 Détente"
+            Simulation = "[Mood] 🏎️ Simulation"
+            Leger      = "[Mood] 🪶 Léger"
+            SShort     = "[Session] ⚡ Court"
+            SMedium    = "[Session] ⏳ Moyen"
+            SLong      = "[Session] 🕰️ Long"
+            Marker     = "[Session] __AUTO__"
         }
         # --- Filter presets: Name + which statuses/tags to filter, by KEY from
         #     Status/Tags above. Add / remove / rename freely. Several tags = OR;
@@ -46,15 +49,19 @@ function Get-Cfg {
         #       SortDir = "Ascending" or "Descending"
         #     (applied only when the preset is first created; delete an existing one to refresh it)
         Presets = @(
-            @{ Name = "Shelf";      Status = @("Shelf"); Sort = "LastActivity"; SortDir = "Descending" },
-            @{ Name = "Evening";    Status = @("Shelf","Evergreen"); Group = "CompletionStatus" },
-            @{ Name = "30 min";     Status = @("Shelf","Evergreen"); Tags = @("SShort"); Group = "CompletionStatus" },
-            @{ Name = "1h";         Status = @("Shelf","Evergreen"); Tags = @("SShort","SMedium"); Group = "CompletionStatus" },
-            @{ Name = "Action";     Status = @("Shelf","Evergreen"); Tags = @("Action"); Group = "CompletionStatus" },
-            @{ Name = "Adventure";  Status = @("Shelf","Evergreen"); Tags = @("Adventure"); Group = "CompletionStatus" },
-            @{ Name = "Chill";      Status = @("Shelf","Evergreen"); Tags = @("Light","Simple"); Group = "CompletionStatus" },
-            @{ Name = "Backlog";    Status = @("Backlog","Hold"); Group = "CompletionStatus"; Sort = "Playtime"; SortDir = "Descending" },
-            @{ Name = "Evergreen";  Status = @("Evergreen") }
+            @{ Name = "Étagère";      Status = @("Shelf"); Sort = "LastActivity"; SortDir = "Descending" },
+            @{ Name = "30 min";      Status = @("Shelf","Evergreen"); Tags = @("SShort"); Group = "CompletionStatus" },
+            @{ Name = "1h";          Status = @("Shelf","Evergreen"); Tags = @("SShort","SMedium"); Group = "CompletionStatus" },
+            @{ Name = "Soirée";      Status = @("Shelf","Evergreen"); Group = "CompletionStatus" },
+            @{ Name = "Evergreen";   Status = @("Evergreen") },
+            @{ Name = "Léger";       Status = @("Shelf","Evergreen"); Tags = @("Leger"); Group = "CompletionStatus" },
+            @{ Name = "Action";      Status = @("Shelf","Evergreen"); Tags = @("Action"); Group = "CompletionStatus" },
+            @{ Name = "Aventure";    Status = @("Shelf","Evergreen"); Tags = @("Aventure"); Group = "CompletionStatus" },
+            @{ Name = "Gestion";     Status = @("Shelf","Evergreen"); Tags = @("Gestion"); Group = "CompletionStatus" },
+            @{ Name = "Réflexion";   Status = @("Shelf","Evergreen"); Tags = @("Reflexion"); Group = "CompletionStatus" },
+            @{ Name = "Détente";     Status = @("Shelf","Evergreen"); Tags = @("Detente"); Group = "CompletionStatus" },
+            @{ Name = "Simulation";  Status = @("Shelf","Evergreen"); Tags = @("Simulation"); Group = "CompletionStatus" },
+            @{ Name = "Backlog";     Status = @("Backlog","Hold"); Group = "CompletionStatus"; Sort = "Playtime"; SortDir = "Descending" }
         )
     }
 }
@@ -232,6 +239,7 @@ function GetMainMenuItems {
     return $items
 }
 
+
 # ---------------------------------------------------------------------------
 #  1) Structure: mood/session tags + the 'evergreen' status
 # ---------------------------------------------------------------------------
@@ -243,7 +251,7 @@ function Invoke-CreateStructure {
     [void](Resolve-Status $c.Status.Evergreen)
 
     $tags = @(
-        $c.Tags.Action, $c.Tags.Adventure, $c.Tags.Simple, $c.Tags.Light,
+        $c.Tags.Action, $c.Tags.Aventure, $c.Tags.Gestion, $c.Tags.Reflexion, $c.Tags.Detente, $c.Tags.Simulation, $c.Tags.Leger,
         $c.Tags.SShort, $c.Tags.SMedium, $c.Tags.SLong
     )
     foreach ($t in $tags) { [void](Resolve-Tag $t) }
@@ -258,7 +266,7 @@ function Invoke-CreateStructure {
         $msg += "`n`nWARNING - these statuses (from Get-Cfg) were NOT found in Playnite:`n  " + ($missing -join ", ") +
                 "`nRename them in Playnite to match, or fix the names in Get-Cfg."
     }
-    $msg += "`n`nNext: tag your games with \"[Mood] ...\" yourself, and run action 3 for a Session draft."
+    $msg += "`n`nNext: tag your games with `"[Mood] ...`" yourself, and run action 3 for a Session draft."
     $PlayniteApi.Dialogs.ShowMessage($msg, "Finish My Games - structure")
 }
 

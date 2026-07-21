@@ -1,18 +1,20 @@
-﻿# Finish My Games - Session mapping (editable, UTF-8)
+﻿# Finish My Games - Mapping des sessions (éditable, UTF-8)
 # ---------------------------------------------------------------------------
-# One line per Session bucket:   <TagName> = <genre>, <genre>, ...
-# A game without any Session/* tag gets the tag of the FIRST bucket (top to
-# bottom) whose genre list contains one of the game's genres. Else DEFAULT.
+# Une ligne par bucket de Session :   <TagSession> = <genre>, <genre>, ...
+# Un jeu sans tag Session reçoit le tag du PREMIER bucket (de haut en bas)
+# dont la liste de genres contient un des genres du jeu. Sinon DEFAULT.
 #
-# - Order matters: higher-priority buckets first (Long before Short).
-# - Tag names must match Get-Cfg in the .psm1 (emoji included) so seeded
-#   games show up in the Session presets.
-# - Edit genres freely. Genre names must match Playnite EXACTLY.
-# - Keep this file UTF-8. Lines starting with # and blank lines are ignored.
+# - L'ordre compte : les buckets prioritaires d'abord (Long avant Court).
+# - Les noms de tag doivent matcher Get-Cfg dans le .psm1 (emoji inclus) pour
+#   que les jeux seedés apparaissent dans les presets Session.
+# - Les noms de genre doivent matcher EXACTEMENT ceux de Playnite (voir
+#   l'action "6) Export genre list (debug)" pour la liste réelle).
+# - Garder ce fichier en UTF-8. Les lignes commençant par # et les lignes
+#   vides sont ignorées.
 # ---------------------------------------------------------------------------
 
-DEFAULT = [Session] ⏳ Medium
+DEFAULT = [Session] ⏳ Moyen
 
-[Session] 🕰️ Long = Role-Playing (RPG), RPG, Role-playing (RPG), Strategy, Real Time Strategy (RTS), Turn-based strategy (TBS), Grand Strategy, 4X, Simulator, Simulation, Massively Multiplayer, MMO, Visual Novel
+[Session] 🕰️ Long = RPG, Real Time Strategy (RTS), Simulation, Visual Novel, Massivement multijoueur, Monde ouvert, Stratégie, Point-and-click
 
-[Session] ⚡ Short = Shoot 'Em Up, Arcade, Fighting, Beat 'em up, Card & Board Game, Board Games, Puzzle, Sports, Racing, Pinball, Music, Rhythm, Party
+[Session] ⚡ Court = Arcade, Combat, Course automobile, Racing, Hack and slash/Beat 'em up, Jeu de cartes, Music, Occasionnel, Plateforme, Puzzle, Quiz/Trivia, Roguelike, Sport, Tir
