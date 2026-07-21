@@ -310,7 +310,6 @@ function Invoke-CreatePresets {
     if ($skipped.Count -gt 0) {
         $msg += "`n`nSkipped (no matching status/tag - check the keys in Get-Cfg.Presets):`n  " + ($skipped -join ", ")
     }
-    $msg += "`n`nStill to create by hand (date filter, ~20s):`n  Recently added = Date added: last month`n`nPin the ones you use most."
     $PlayniteApi.Dialogs.ShowMessage($msg, "Finish My Games - presets")
 }
 
