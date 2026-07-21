@@ -49,18 +49,18 @@ function Get-Cfg {
         #       SortDir = "Ascending" or "Descending"
         #     (applied only when the preset is first created; delete an existing one to refresh it)
         Presets = @(
-            @{ Name = "📚 Étagère";      Status = @("Shelf"); Sort = "LastActivity"; SortDir = "Descending" },
-            @{ Name = "⚡ 30 min";      Status = @("Shelf","Evergreen"); Tags = @("SShort"); Group = "CompletionStatus" },
-            @{ Name = "⏳ 1h";          Status = @("Shelf","Evergreen"); Tags = @("SShort","SMedium"); Group = "CompletionStatus" },
-            @{ Name = "🕰️ Soirée";      Status = @("Shelf","Evergreen"); Group = "CompletionStatus" },
+            @{ Name = "📚 Étagère";     Status = @("Shelf"); Sort = "LastActivity"; SortDir = "Descending" },
             @{ Name = "♾️ Evergreen";   Status = @("Evergreen") },
-            @{ Name = "🪶 Léger";       Status = @("Shelf","Evergreen"); Tags = @("Leger"); Group = "CompletionStatus" },
-            @{ Name = "💥 Action";      Status = @("Shelf","Evergreen"); Tags = @("Action"); Group = "CompletionStatus" },
-            @{ Name = "🗺️ Aventure";    Status = @("Shelf","Evergreen"); Tags = @("Aventure"); Group = "CompletionStatus" },
-            @{ Name = "🏗️ Gestion";     Status = @("Shelf","Evergreen"); Tags = @("Gestion"); Group = "CompletionStatus" },
-            @{ Name = "🧩 Réflexion";   Status = @("Shelf","Evergreen"); Tags = @("Reflexion"); Group = "CompletionStatus" },
-            @{ Name = "🍃 Détente";     Status = @("Shelf","Evergreen"); Tags = @("Detente"); Group = "CompletionStatus" },
-            @{ Name = "🏎️ Simulation";  Status = @("Shelf","Evergreen"); Tags = @("Simulation"); Group = "CompletionStatus" },
+            @{ Name = "⏳ Court";       Status = @("Shelf","Evergreen"); Tags = @("SShort"); Group = "CompletionStatus" },
+            @{ Name = "⏳ Moyen";       Status = @("Shelf","Evergreen"); Tags = @("SShort","SMedium"); Group = "CompletionStatus" },
+            @{ Name = "⏳ Long";        Status = @("Shelf","Evergreen"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Léger";       Status = @("Shelf","Evergreen"); Tags = @("Leger"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Action";      Status = @("Shelf","Evergreen"); Tags = @("Action"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Aventure";    Status = @("Shelf","Evergreen"); Tags = @("Aventure"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Gestion";     Status = @("Shelf","Evergreen"); Tags = @("Gestion"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Réflexion";   Status = @("Shelf","Evergreen"); Tags = @("Reflexion"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Détente";     Status = @("Shelf","Evergreen"); Tags = @("Detente"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Simulation";  Status = @("Shelf","Evergreen"); Tags = @("Simulation"); Group = "CompletionStatus" },
             @{ Name = "📥 Backlog";     Status = @("Backlog","Hold"); Group = "CompletionStatus"; Sort = "Playtime"; SortDir = "Descending" }
         )
     }
