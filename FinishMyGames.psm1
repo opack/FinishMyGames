@@ -15,14 +15,14 @@ function Get-Cfg {
         #     Colonnes Kanban : "À jouer" / "En cours" / "Joué".
         #     Rename a status in Playnite? Update the matching line here.
         Status = @{
-            NotYet    = "À jouer (non débuté)"     # tout neuf, pas encore trié
-            Backlog   = "À jouer (backlog)"          # intention d'y jouer
-            Hold      = "À jouer (en pause)"       # en pause, toujours candidat
-            Shelf     = "En cours (sur l'étagère)"       # étagère active (plafond = cap)
-            Evergreen = "En cours (evergreen)"     # toujours bon à jouer (créé par cette extension)
-            Abandoned = "Joué (abandonné)"         # n'y reviendra pas
-            Finished  = "Joué (fini)"              # j'ai eu ce que je voulais
-            Beaten    = "Joué (terminé)"           # 100% / boss de fin battu
+            NotYet    = "🚧 Non débuté"    # tout neuf, pas encore trié
+            Backlog   = "🚧 Backlog"       # intention d'y jouer
+            Hold      = "🚧 En pause"      # en pause, toujours candidat
+            Shelf     = "🎮 Sur l'étagère" # étagère active (plafond = cap)
+            Evergreen = "🎮 Evergreen"     # toujours bon à jouer (créé par cette extension)
+            Abandoned = "✅ Abandonné"     # n'y reviendra pas
+            Closed    = "✅ Classé"          # j'ai eu ce que je voulais
+            Beaten    = "✅ Terminé"       # 100% / boss de fin battu
         }
         # --- Tags (emojis OK; file is UTF-8 BOM).
         Tags = @{
@@ -49,19 +49,19 @@ function Get-Cfg {
         #       SortDir = "Ascending" or "Descending"
         #     (applied only when the preset is first created; delete an existing one to refresh it)
         Presets = @(
-            @{ Name = "Étagère";      Status = @("Shelf"); Sort = "LastActivity"; SortDir = "Descending" },
-            @{ Name = "30 min";      Status = @("Shelf","Evergreen"); Tags = @("SShort"); Group = "CompletionStatus" },
-            @{ Name = "1h";          Status = @("Shelf","Evergreen"); Tags = @("SShort","SMedium"); Group = "CompletionStatus" },
-            @{ Name = "Soirée";      Status = @("Shelf","Evergreen"); Group = "CompletionStatus" },
-            @{ Name = "Evergreen";   Status = @("Evergreen") },
-            @{ Name = "Léger";       Status = @("Shelf","Evergreen"); Tags = @("Leger"); Group = "CompletionStatus" },
-            @{ Name = "Action";      Status = @("Shelf","Evergreen"); Tags = @("Action"); Group = "CompletionStatus" },
-            @{ Name = "Aventure";    Status = @("Shelf","Evergreen"); Tags = @("Aventure"); Group = "CompletionStatus" },
-            @{ Name = "Gestion";     Status = @("Shelf","Evergreen"); Tags = @("Gestion"); Group = "CompletionStatus" },
-            @{ Name = "Réflexion";   Status = @("Shelf","Evergreen"); Tags = @("Reflexion"); Group = "CompletionStatus" },
-            @{ Name = "Détente";     Status = @("Shelf","Evergreen"); Tags = @("Detente"); Group = "CompletionStatus" },
-            @{ Name = "Simulation";  Status = @("Shelf","Evergreen"); Tags = @("Simulation"); Group = "CompletionStatus" },
-            @{ Name = "Backlog";     Status = @("Backlog","Hold"); Group = "CompletionStatus"; Sort = "Playtime"; SortDir = "Descending" }
+            @{ Name = "📚 Étagère";      Status = @("Shelf"); Sort = "LastActivity"; SortDir = "Descending" },
+            @{ Name = "⚡ 30 min";      Status = @("Shelf","Evergreen"); Tags = @("SShort"); Group = "CompletionStatus" },
+            @{ Name = "⏳ 1h";          Status = @("Shelf","Evergreen"); Tags = @("SShort","SMedium"); Group = "CompletionStatus" },
+            @{ Name = "🕰️ Soirée";      Status = @("Shelf","Evergreen"); Group = "CompletionStatus" },
+            @{ Name = "♾️ Evergreen";   Status = @("Evergreen") },
+            @{ Name = "🪶 Léger";       Status = @("Shelf","Evergreen"); Tags = @("Leger"); Group = "CompletionStatus" },
+            @{ Name = "💥 Action";      Status = @("Shelf","Evergreen"); Tags = @("Action"); Group = "CompletionStatus" },
+            @{ Name = "🗺️ Aventure";    Status = @("Shelf","Evergreen"); Tags = @("Aventure"); Group = "CompletionStatus" },
+            @{ Name = "🏗️ Gestion";     Status = @("Shelf","Evergreen"); Tags = @("Gestion"); Group = "CompletionStatus" },
+            @{ Name = "🧩 Réflexion";   Status = @("Shelf","Evergreen"); Tags = @("Reflexion"); Group = "CompletionStatus" },
+            @{ Name = "🍃 Détente";     Status = @("Shelf","Evergreen"); Tags = @("Detente"); Group = "CompletionStatus" },
+            @{ Name = "🏎️ Simulation";  Status = @("Shelf","Evergreen"); Tags = @("Simulation"); Group = "CompletionStatus" },
+            @{ Name = "📥 Backlog";     Status = @("Backlog","Hold"); Group = "CompletionStatus"; Sort = "Playtime"; SortDir = "Descending" }
         )
     }
 }
@@ -256,7 +256,7 @@ function Invoke-CreateStructure {
     )
     foreach ($t in $tags) { [void](Resolve-Tag $t) }
 
-    $needed = @($c.Status.NotYet, $c.Status.Backlog, $c.Status.Hold, $c.Status.Shelf, $c.Status.Abandoned, $c.Status.Finished, $c.Status.Beaten)
+    $needed = @($c.Status.NotYet, $c.Status.Backlog, $c.Status.Hold, $c.Status.Shelf, $c.Status.Abandoned, $c.Status.Closed, $c.Status.Beaten)
     $missing = @()
     foreach ($s in $needed) { if ($null -eq (Find-Status $s)) { $missing += $s } }
 
