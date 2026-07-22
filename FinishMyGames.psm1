@@ -36,7 +36,6 @@ function Get-Cfg {
             SShort     = "[Session] ⚡ Court"
             SMedium    = "[Session] ⏳ Moyen"
             SLong      = "[Session] 🕰️ Long"
-            Marker     = "[Session] __AUTO__"
         }
         # --- Filter presets: Name + which statuses/tags to filter, by KEY from
         #     Status/Tags above. Add / remove / rename freely. Several tags = OR;
@@ -94,16 +93,6 @@ function Resolve-Tag {
     return $existing
 }
 
-function Test-GameHasTagLike {
-    param($Game, [string]$Pattern)
-    if ($null -eq $Game.TagIds) { return $false }
-    foreach ($tid in $Game.TagIds) {
-        $t = $PlayniteApi.Database.Tags.Get($tid)
-        if ($t -and $t.Name -like $Pattern) { return $true }
-    }
-    return $false
-}
-
 function Add-GameTags {
     param($Game, [Guid[]]$TagIds)
     $ids = New-Object 'System.Collections.Generic.List[Guid]'
@@ -154,29 +143,6 @@ function Set-Cap {
     Set-Content -Path (Join-Path $PSScriptRoot "config.txt") -Value $N -Encoding UTF8
 }
 
-# ---- Session mapping (loaded from editable session-map.txt) ----------------
-
-function Get-SessionMap {
-    $path = Join-Path $PSScriptRoot "session-map.txt"
-    $default = (Get-Cfg).Tags.SMedium
-    $buckets = @()
-    if (Test-Path $path) {
-        foreach ($line in (Get-Content $path -Encoding UTF8)) {
-            $l = $line.Trim()
-            if ($l -eq "" -or $l.StartsWith("#")) { continue }
-            $idx = $l.IndexOf("=")
-            if ($idx -lt 0) { continue }
-            $key = $l.Substring(0, $idx).Trim()
-            $val = $l.Substring($idx + 1).Trim()
-            if ($key -eq "DEFAULT") { $default = $val; continue }
-            $genres = @()
-            foreach ($g in $val.Split(",")) { $t = $g.Trim(); if ($t -ne "") { $genres += $t } }
-            if ($key -ne "") { $buckets += @{ Tag = $key; Genres = $genres } }
-        }
-    }
-    return @{ Default = $default; Buckets = $buckets; Path = $path }
-}
-
 # ---- Workflow helpers ------------------------------------------------------
 
 function Set-GameStatus {
@@ -223,9 +189,8 @@ function GetMainMenuItems {
     $defs = @(
         @{ D = "1) Create tags + 'Evergreen' status";        F = "Invoke-CreateStructure" },
         @{ D = "2) Create filter presets";                   F = "Invoke-CreatePresets" },
-        @{ D = "3) Seed Session tags from genres (draft)";   F = "Invoke-SeedSession" },
-        @{ D = "4) Count the active shelf";                  F = "Invoke-CountShelf" },
-        @{ D = "5) Set the shelf cap...";                    F = "Invoke-SetShelfCap" }
+        @{ D = "3) Count the active shelf";                  F = "Invoke-CountShelf" },
+        @{ D = "4) Set the shelf cap...";                    F = "Invoke-SetShelfCap" }
     )
 
     $items = @()
@@ -266,7 +231,7 @@ function Invoke-CreateStructure {
         $msg += "`n`nWARNING - these statuses (from Get-Cfg) were NOT found in Playnite:`n  " + ($missing -join ", ") +
                 "`nRename them in Playnite to match, or fix the names in Get-Cfg."
     }
-    $msg += "`n`nNext: tag your games with `"[Mood] ...`" yourself, and run action 3 for a Session draft."
+    $msg += "`n`nNext: tag your games with `"[Mood] ...`" and `"[Session] ...`" yourself - both are manual, no auto-tagging."
     $PlayniteApi.Dialogs.ShowMessage($msg, "Finish My Games - structure")
 }
 
@@ -314,68 +279,7 @@ function Invoke-CreatePresets {
 }
 
 # ---------------------------------------------------------------------------
-#  3) Seed Session tags from genres (draft). Only games with no Session tag yet.
-# ---------------------------------------------------------------------------
-
-function Invoke-SeedSession {
-    param($actionArgs)
-    $c = Get-Cfg
-    $map = Get-SessionMap
-
-    $go = $PlayniteApi.Dialogs.ShowMessage(
-        "This puts a Session tag on games that have none, based on their genres, using the rules in:`n  $($map.Path)`n`n" +
-        "It's a DRAFT: each touched game also gets the '$($c.Tags.Marker)' marker so you can filter and fix them.`n`nDid you make a backup? Continue?",
-        "Finish My Games - Session (draft)",
-        'YesNo'
-    )
-    if ($go -ne 'Yes') { return }
-
-    foreach ($b in $map.Buckets) { [void](Resolve-Tag $b.Tag) }
-    [void](Resolve-Tag $map.Default)
-    $marker = Resolve-Tag $c.Tags.Marker
-
-    # Set of "already has a Session tag" ids - robust to any tag naming scheme.
-    $sessionIds = New-Object 'System.Collections.Generic.HashSet[Guid]'
-    foreach ($b in $map.Buckets) { $bt = Find-Tag $b.Tag; if ($bt) { [void]$sessionIds.Add($bt.Id) } }
-    $dt = Find-Tag $map.Default; if ($dt) { [void]$sessionIds.Add($dt.Id) }
-    foreach ($nm in @($c.Tags.SShort, $c.Tags.SMedium, $c.Tags.SLong)) { $ct = Find-Tag $nm; if ($ct) { [void]$sessionIds.Add($ct.Id) } }
-    [void]$sessionIds.Add($marker.Id)
-
-    $touched = 0
-    foreach ($game in $PlayniteApi.Database.Games) {
-        $already = $false
-        if ($null -ne $game.TagIds) { foreach ($tid in $game.TagIds) { if ($sessionIds.Contains($tid)) { $already = $true; break } } }
-        if ($already) { continue }
-
-        $genreNames = @()
-        if ($null -ne $game.GenreIds) {
-            foreach ($gid in $game.GenreIds) {
-                $g = $PlayniteApi.Database.Genres.Get($gid)
-                if ($g) { $genreNames += $g.Name }
-            }
-        }
-
-        $chosen = $null
-        foreach ($b in $map.Buckets) {
-            $hit = $false
-            foreach ($gn in $genreNames) { if ($b.Genres -contains $gn) { $hit = $true; break } }
-            if ($hit) { $chosen = $b.Tag; break }
-        }
-        if ($null -eq $chosen) { $chosen = $map.Default }
-
-        $tagObj = Resolve-Tag $chosen
-        Add-GameTags $game @($tagObj.Id, $marker.Id)
-        $touched++
-    }
-
-    $PlayniteApi.Dialogs.ShowMessage(
-        "Draft applied to $touched game(s).`n`nTo review: filter on the '$($c.Tags.Marker)' tag, fix the mistakes, then remove that marker as you go.`n`nTo change the rules, edit session-map.txt and run this action again.",
-        "Finish My Games - Session (draft)"
-    )
-}
-
-# ---------------------------------------------------------------------------
-#  4) Count the active shelf
+#  3) Count the active shelf
 # ---------------------------------------------------------------------------
 
 function Invoke-CountShelf {
@@ -397,7 +301,7 @@ function Invoke-CountShelf {
 }
 
 # ---------------------------------------------------------------------------
-#  5) Set the shelf cap
+#  4) Set the shelf cap
 # ---------------------------------------------------------------------------
 
 function Invoke-SetShelfCap {
