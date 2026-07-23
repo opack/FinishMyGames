@@ -1,8 +1,9 @@
 ﻿# ============================================================================
 #  Finish My Games - Setup for Playnite
 #
-#  ALL names (statuses + tags) live in Get-Cfg below. That is the ONE place
-#  to edit if you rename a status/tag in Playnite (or want other emojis).
+#  ALL names (statuses + categories + tags) live in Get-Cfg below. That is
+#  the ONE place to edit if you rename a status/category/tag in Playnite
+#  (or want other emojis).
 #
 #  This file is UTF-8 WITH BOM. Emojis/accents are fine as long as the BOM
 #  stays. Do NOT re-save it in an editor that strips the BOM.
@@ -24,22 +25,33 @@ function Get-Cfg {
             Closed    = "✅ Classé"          # j'ai eu ce que je voulais
             Beaten    = "✅ Terminé"       # 100% / boss de fin battu
         }
-        # --- Tags (emojis OK; file is UTF-8 BOM).
-        Tags = @{
-            Action     = "[Mood] 💥 Action"
-            Aventure   = "[Mood] 🗺️ Aventure"
-            Gestion    = "[Mood] 🏗️ Gestion"
-            Reflexion  = "[Mood] 🧩 Réflexion"
-            Detente    = "[Mood] 🍃 Détente"
-            Simulation = "[Mood] 🏎️ Simulation"
-            Leger      = "[Mood] 🪶 Léger"
-            SShort     = "[Session] ⚡ Court"
-            SMedium    = "[Session] ⏳ Moyen"
-            SLong      = "[Session] 🕰️ Long"
+        # --- Categories: Humeur (🎭) + Session durations (⚡/⏳/🕰️).
+        #     Multi-valued on a game, alongside your finer Catégorie/Type values
+        #     (managed in Playnite/Notion, not by this script).
+        #     Action/Aventure/Gestion/Reflexion/Detente/Simulation are populated
+        #     automatically by your dynamic-rules addon from the fine Catégorie.
+        #     Leger has no Notion Genre counterpart (yet?) so stays manual, same
+        #     as Session, which has no reliable auto-source either way.
+        Categories = @{
+            Action     = "🎭 Action"
+            Aventure   = "🎭 Aventure"
+            Gestion    = "🎭 Gestion"
+            Reflexion  = "🎭 Réflexion"
+            Detente    = "🎭 Détente"
+            Simulation = "🎭 Simulation"
+            Leger      = "🎭 Léger"
+            SShort     = "⏳ Court"
+            SMedium    = "⏳ Moyen"
+            SLong      = "⏳ Long"
         }
-        # --- Filter presets: Name + which statuses/tags to filter, by KEY from
-        #     Status/Tags above. Add / remove / rename freely. Several tags = OR;
-        #     several statuses = OR. Keys must exist in Status/Tags.
+        # --- Tags: nothing lives here right now - reserved for anything outside
+        #     the Humeur/Session/Catégorie system, should you need it later.
+        Tags = @{
+        }
+        # --- Filter presets: Name + which statuses/categories/tags to filter, by
+        #     KEY from Status/Categories/Tags above. Add / remove / rename freely.
+        #     Several values in one list = OR; several statuses = OR. Keys must
+        #     exist in Status/Categories/Tags.
         #     Optional per preset: Group / Sort / SortDir to auto-group & sort the view.
         #       Group   = a GroupableField name (CompletionStatus, Genre, Platform, PlayTime, Source, Added...)
         #                 full list: https://api.playnite.link/docs/api/Playnite.SDK.Models.GroupableField.html
@@ -50,16 +62,16 @@ function Get-Cfg {
         Presets = @(
             @{ Name = "📚 Étagère";     Status = @("Shelf"); Sort = "LastActivity"; SortDir = "Descending" },
             @{ Name = "♾️ Evergreen";   Status = @("Evergreen") },
-            @{ Name = "⏳ Court";       Status = @("Shelf","Evergreen"); Tags = @("SShort"); Group = "CompletionStatus" },
-            @{ Name = "⏳ Moyen";       Status = @("Shelf","Evergreen"); Tags = @("SShort","SMedium"); Group = "CompletionStatus" },
+            @{ Name = "⏳ Court";       Status = @("Shelf","Evergreen"); Categories = @("SShort"); Group = "CompletionStatus" },
+            @{ Name = "⏳ Moyen";       Status = @("Shelf","Evergreen"); Categories = @("SShort","SMedium"); Group = "CompletionStatus" },
             @{ Name = "⏳ Long";        Status = @("Shelf","Evergreen"); Group = "CompletionStatus" },
-            @{ Name = "🎭 Léger";       Status = @("Shelf","Evergreen"); Tags = @("Leger"); Group = "CompletionStatus" },
-            @{ Name = "🎭 Action";      Status = @("Shelf","Evergreen"); Tags = @("Action"); Group = "CompletionStatus" },
-            @{ Name = "🎭 Aventure";    Status = @("Shelf","Evergreen"); Tags = @("Aventure"); Group = "CompletionStatus" },
-            @{ Name = "🎭 Gestion";     Status = @("Shelf","Evergreen"); Tags = @("Gestion"); Group = "CompletionStatus" },
-            @{ Name = "🎭 Réflexion";   Status = @("Shelf","Evergreen"); Tags = @("Reflexion"); Group = "CompletionStatus" },
-            @{ Name = "🎭 Détente";     Status = @("Shelf","Evergreen"); Tags = @("Detente"); Group = "CompletionStatus" },
-            @{ Name = "🎭 Simulation";  Status = @("Shelf","Evergreen"); Tags = @("Simulation"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Léger";       Status = @("Shelf","Evergreen"); Categories = @("Leger"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Action";      Status = @("Shelf","Evergreen"); Categories = @("Action"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Aventure";    Status = @("Shelf","Evergreen"); Categories = @("Aventure"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Gestion";     Status = @("Shelf","Evergreen"); Categories = @("Gestion"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Réflexion";   Status = @("Shelf","Evergreen"); Categories = @("Reflexion"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Détente";     Status = @("Shelf","Evergreen"); Categories = @("Detente"); Group = "CompletionStatus" },
+            @{ Name = "🎭 Simulation";  Status = @("Shelf","Evergreen"); Categories = @("Simulation"); Group = "CompletionStatus" },
             @{ Name = "📥 Backlog";     Status = @("Backlog","Hold"); Group = "CompletionStatus"; Sort = "Playtime"; SortDir = "Descending" }
         )
     }
@@ -93,13 +105,16 @@ function Resolve-Tag {
     return $existing
 }
 
-function Add-GameTags {
-    param($Game, [Guid[]]$TagIds)
-    $ids = New-Object 'System.Collections.Generic.List[Guid]'
-    if ($null -ne $Game.TagIds) { $ids.AddRange($Game.TagIds) }
-    foreach ($id in $TagIds) { if (-not $ids.Contains($id)) { $ids.Add($id) } }
-    $Game.TagIds = $ids
-    $PlayniteApi.Database.Games.Update($Game)
+function Find-Category {
+    param([string]$Name)
+    return $PlayniteApi.Database.Categories | Where-Object { $_.Name -eq $Name } | Select-Object -First 1
+}
+
+function Resolve-Category {
+    param([string]$Name)
+    $existing = Find-Category $Name
+    if ($null -eq $existing) { return $PlayniteApi.Database.Categories.Add($Name) }
+    return $existing
 }
 
 function New-IdFilter {
@@ -187,7 +202,7 @@ function GetMainMenuItems {
 
     $section = "@|Finish My Games"
     $defs = @(
-        @{ D = "1) Create tags + 'Evergreen' status";        F = "Invoke-CreateStructure" },
+        @{ D = "1) Create categories/tags + 'Evergreen' status"; F = "Invoke-CreateStructure" },
         @{ D = "2) Create filter presets";                   F = "Invoke-CreatePresets" },
         @{ D = "3) Count the active shelf";                  F = "Invoke-CountShelf" },
         @{ D = "4) Set the shelf cap...";                    F = "Invoke-SetShelfCap" }
@@ -206,7 +221,7 @@ function GetMainMenuItems {
 
 
 # ---------------------------------------------------------------------------
-#  1) Structure: mood/session tags + the 'evergreen' status
+#  1) Structure: mood/session categories + tags + the 'evergreen' status
 # ---------------------------------------------------------------------------
 
 function Invoke-CreateStructure {
@@ -215,10 +230,13 @@ function Invoke-CreateStructure {
 
     [void](Resolve-Status $c.Status.Evergreen)
 
-    $tags = @(
-        $c.Tags.Action, $c.Tags.Aventure, $c.Tags.Gestion, $c.Tags.Reflexion, $c.Tags.Detente, $c.Tags.Simulation, $c.Tags.Leger,
-        $c.Tags.SShort, $c.Tags.SMedium, $c.Tags.SLong
+    $cats = @(
+        $c.Categories.Action, $c.Categories.Aventure, $c.Categories.Gestion, $c.Categories.Reflexion, $c.Categories.Detente, $c.Categories.Simulation, $c.Categories.Leger,
+        $c.Categories.SShort, $c.Categories.SMedium, $c.Categories.SLong
     )
+    foreach ($cat in $cats) { [void](Resolve-Category $cat) }
+
+    $tags = @($c.Tags.Values)
     foreach ($t in $tags) { [void](Resolve-Tag $t) }
 
     $needed = @($c.Status.NotYet, $c.Status.Backlog, $c.Status.Hold, $c.Status.Shelf, $c.Status.Abandoned, $c.Status.Closed, $c.Status.Beaten)
@@ -226,12 +244,16 @@ function Invoke-CreateStructure {
     foreach ($s in $needed) { if ($null -eq (Find-Status $s)) { $missing += $s } }
 
     $msg = "Done.`n`nCreated status (or already present): $($c.Status.Evergreen)`n" +
-           "Created tags (or already present):`n  " + ($tags -join ", ")
+           "Created categories (or already present):`n  " + ($cats -join ", ")
+    if ($tags.Count -gt 0) {
+        $msg += "`n" + "Created tags (or already present):`n  " + ($tags -join ", ")
+    }
     if ($missing.Count -gt 0) {
         $msg += "`n`nWARNING - these statuses (from Get-Cfg) were NOT found in Playnite:`n  " + ($missing -join ", ") +
                 "`nRename them in Playnite to match, or fix the names in Get-Cfg."
     }
-    $msg += "`n`nNext: tag your games with `"[Mood] ...`" and `"[Session] ...`" yourself - both are manual, no auto-tagging."
+    $msg += "`n`nNext: Session and Léger categories are manual - assign them yourself, no reliable auto-source exists. " +
+            "The other Humeur categories (Action/Aventure/Gestion/Réflexion/Détente/Simulation) get populated automatically by your dynamic-rules addon once a game has a fine Catégorie - nothing to do by hand there."
     $PlayniteApi.Dialogs.ShowMessage($msg, "Finish My Games - structure")
 }
 
@@ -261,6 +283,12 @@ function Invoke-CreatePresets {
             if ($sids.Count -gt 0) { $settings.CompletionStatuses = New-IdFilter $sids; $hasFilter = $true }
         }
 
+        if ($p.ContainsKey("Categories") -and @($p.Categories).Count -gt 0) {
+            $cids = @()
+            foreach ($k in $p.Categories) { $nm = $c.Categories[$k]; if ($nm) { $cg = Resolve-Category $nm; $cids += $cg.Id } }
+            if ($cids.Count -gt 0) { $settings.Category = New-IdFilter $cids; $hasFilter = $true }
+        }
+
         if ($p.ContainsKey("Tags") -and @($p.Tags).Count -gt 0) {
             $tids = @()
             foreach ($k in $p.Tags) { $nm = $c.Tags[$k]; if ($nm) { $tg = Resolve-Tag $nm; $tids += $tg.Id } }
@@ -273,7 +301,7 @@ function Invoke-CreatePresets {
 
     $msg = "Presets created (or already present):`n  " + ($created -join "`n  ")
     if ($skipped.Count -gt 0) {
-        $msg += "`n`nSkipped (no matching status/tag - check the keys in Get-Cfg.Presets):`n  " + ($skipped -join ", ")
+        $msg += "`n`nSkipped (no matching status/category/tag - check the keys in Get-Cfg.Presets):`n  " + ($skipped -join ", ")
     }
     $PlayniteApi.Dialogs.ShowMessage($msg, "Finish My Games - presets")
 }
