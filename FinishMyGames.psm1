@@ -83,12 +83,14 @@ function Get-Cfg {
 
 function Find-Status {
     param([string]$Name)
-    return $PlayniteApi.Database.CompletionStatuses | Where-Object { $_.Name -eq $Name } | Select-Object -First 1
+    $target = Get-NormalizedName $Name
+    return $PlayniteApi.Database.CompletionStatuses | Where-Object { (Get-NormalizedName $_.Name) -eq $target } | Select-Object -First 1
 }
 
 function Find-Tag {
     param([string]$Name)
-    return $PlayniteApi.Database.Tags | Where-Object { $_.Name -eq $Name } | Select-Object -First 1
+    $target = Get-NormalizedName $Name
+    return $PlayniteApi.Database.Tags | Where-Object { (Get-NormalizedName $_.Name) -eq $target } | Select-Object -First 1
 }
 
 function Resolve-Status {
@@ -105,9 +107,21 @@ function Resolve-Tag {
     return $existing
 }
 
+function Get-NormalizedName {
+    param([string]$Name)
+    # Notion itself isn't consistent about which apostrophe character it uses inside a
+    # single name (straight ' vs curly '/' vs backtick) - Claude's suggestions faithfully
+    # copy whatever Notion actually has, so a straight comparison can treat an existing
+    # category/status/tag as brand new just because of a punctuation glyph mismatch.
+    # Normalize before comparing so that doesn't happen.
+    if ($null -eq $Name) { return $Name }
+    return $Name -replace '[‘’ʼ`]', "'"
+}
+
 function Find-Category {
     param([string]$Name)
-    return $PlayniteApi.Database.Categories | Where-Object { $_.Name -eq $Name } | Select-Object -First 1
+    $target = Get-NormalizedName $Name
+    return $PlayniteApi.Database.Categories | Where-Object { (Get-NormalizedName $_.Name) -eq $target } | Select-Object -First 1
 }
 
 function Resolve-Category {
@@ -218,7 +232,6 @@ function GetMainMenuItems {
     }
     return $items
 }
-
 
 # ---------------------------------------------------------------------------
 #  1) Structure: mood/session categories + tags + the 'evergreen' status
@@ -359,7 +372,8 @@ function GetGameMenuItems {
 
     $section = "Finish My Games"
     $defs = @(
-        @{ D = "Put on shelf (respects the cap)"; F = "Invoke-SetShelf" }
+        @{ D = "Put on shelf (respects the cap)"; F = "Invoke-SetShelf" },
+        @{ D = "Suggérer une catégorie (Claude)"; F = "Invoke-SuggestCategory" }
     )
 
     $items = @()
@@ -396,5 +410,202 @@ function Invoke-SetShelf {
     }
     if ($added -gt 0) {
         $PlayniteApi.Dialogs.ShowMessage("$added game(s) put on the shelf. Shelf: $count/$cap.", "Shelf")
+    }
+}
+
+# ---------------------------------------------------------------------------
+#  Suggest category via Claude Code (needs 'claude' CLI installed, logged
+#  into your Max plan, in PATH, with the Notion connector authorized and the
+#  'playnite-categorize' skill saved to your account).
+# ---------------------------------------------------------------------------
+
+function Invoke-SuggestCategory {
+    param($actionArgs)
+    $games = @($actionArgs.Games)
+    # NOTE: context (tags/description/format instructions) goes over stdin, not as a
+    # CLI argument - a JSON --json-schema argument breaks on Windows because it has to
+    # survive PowerShell -> the npm .cmd shim -> cmd.exe, three layers of quoting that
+    # do not agree on how to escape embedded quotes/braces. Keeping the -p argument to
+    # a short, plain string and piping the rest via stdin (the documented
+    # "cat file | claude -p ..." pattern) sidesteps that entirely.
+    #
+    # NOTE: PowerShell decodes an external process's stdout/stdin using the console's
+    # OutputEncoding, which on Windows is usually a legacy codepage, not UTF-8 - so
+    # accents come back mangled ("Ã©" instead of "é") unless we force it here.
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+    # Resolve the full path to 'claude' HERE, in the function's normal execution
+    # context (the one that's proven to work), rather than relying on a PATH lookup
+    # happening inside the ActivateGlobalProgress action below - if that action runs
+    # in a different thread/runspace, it may not see the same PATH, which would
+    # explain a call that works standalone but not wrapped in the progress overlay.
+    $claudeCmd = Get-Command claude -ErrorAction SilentlyContinue
+    if (-not $claudeCmd) {
+        $PlayniteApi.Dialogs.ShowMessage("'claude' introuvable dans le PATH de ce contexte. Verifie l'installation de Claude Code.", "Finish My Games - suggestion")
+        return
+    }
+    $claudePath = $claudeCmd.Source
+
+    foreach ($g in $games) {
+        $tagNames = @()
+        if ($g.Tags) { $tagNames = $g.Tags | ForEach-Object { $_.Name } }
+        $tags = $tagNames -join ", "
+        $desc = "(pas de description)"
+        if ($g.Description) { $desc = $g.Description -replace '<[^>]+>', '' }
+
+        $promptArg = "/playnite-categorize $($g.Name)"
+        $stdinContent = "Tags Steam (deja recuperes par Playnite): $tags`nDescription: $desc`n`n" +
+            "Termine ta réponse par exactement ces deux lignes, rien d'autre après :`n" +
+            "CATEGORIES: nom1 :: description Notion de nom1 ; nom2 :: description Notion de nom2`n" +
+            "REASONING: raisonnement sur une seule ligne"
+
+        # Reverted the ActivateGlobalProgress wrapper - three different fixes on it
+        # (typed delegate cast, $script: scope, GetNewClosure) all failed to produce
+        # any output at all, while this exact call works fine unwrapped. Rather than
+        # keep guessing at why that specific API misbehaves here, back to a plain
+        # synchronous call: the UI freezes during the call (as originally flagged),
+        # but a Playnite notification at least gives a visible sign something is
+        # happening, without needing the fragile delegate machinery.
+        # --allowedTools abandonne : chez Didier le serveur Notion est enregistre
+        # sous le nom "claude.ai Notion" (synchronise depuis le compte claude.ai,
+        # pas ajoute a la main), et le nom d'outil interne exact qui en decoule
+        # n'est pas deductible depuis l'exterieur (confirme empiriquement : meme
+        # Claude lui-meme ne peut pas le lister sans l'appeler). On bascule donc
+        # sur --dangerously-skip-permissions : ca desactive TOUTE demande de
+        # permission pour cet appel precis (pas seulement Notion), mais le prompt
+        # de la skill est strictement cadre (une seule lecture Notion en lecture
+        # seule), donc le risque reel est faible pour ce script perso.
+        $raw = $stdinContent | & $claudePath -p $promptArg --output-format json --dangerously-skip-permissions 2>&1
+
+        if ($null -eq $raw -or [string]::IsNullOrWhiteSpace(($raw -join "`n"))) {
+            $PlayniteApi.Dialogs.ShowMessage("Pas de sortie du tout pour '$($g.Name)'. Verifie que 'claude' est installe, connecte, et dans le PATH.", "Finish My Games - suggestion")
+            continue
+        }
+
+        $response = $null
+        try {
+            $response = $raw | ConvertFrom-Json
+        } catch {
+            $PlayniteApi.Dialogs.ShowMessage("Échec de l'appel à Claude Code pour '$($g.Name)'. Vérifie que 'claude' est installé, connecté à ton forfait Max, et dans le PATH.`n`nErreur : $_", "Finish My Games - suggestion")
+            continue
+        }
+
+        if ($null -eq $response -or -not $response.result) {
+            $PlayniteApi.Dialogs.ShowMessage("Pas de réponse exploitable pour '$($g.Name)'. Sortie brute :`n$raw", "Finish My Games - suggestion")
+            continue
+        }
+
+        $lines = $response.result -split "`n"
+        $catLine = $lines | Where-Object { $_ -match '^CATEGORIES:' } | Select-Object -First 1
+        $reasonLine = $lines | Where-Object { $_ -match '^REASONING:' } | Select-Object -First 1
+
+        if (-not $catLine) {
+            $PlayniteApi.Dialogs.ShowMessage("$($g.Name) : réponse dans un format inattendu, à lire toi-même :`n`n$($response.result)", "Finish My Games - suggestion")
+            continue
+        }
+
+        # Each suggested category comes as "nom :: description", entries separated by
+        # ";" - the description both feeds the Notion reminder below and is a soft
+        # signal the name was actually matched against a real Notion row rather than
+        # invented, since the skill is only ever supposed to suggest categories that
+        # already exist in the live Notion table.
+        $catsRaw = $catLine -replace '^CATEGORIES:\s*', ''
+        $suggestedList = @()
+        foreach ($entry in ($catsRaw -split '\s*;\s*' | Where-Object { $_ })) {
+            $parts = $entry -split '\s*::\s*', 2
+            $name = $parts[0].Trim()
+            $descr = if ($parts.Count -gt 1) { $parts[1].Trim() } else { "" }
+            if ($name) { $suggestedList += [PSCustomObject]@{ Name = $name; Description = $descr } }
+        }
+        $reasoning = if ($reasonLine) { $reasonLine -replace '^REASONING:\s*', '' } else { $response.result }
+
+        if ($suggestedList.Count -eq 0) {
+            $PlayniteApi.Dialogs.ShowMessage("$($g.Name) : aucune catégorie suggérée.`n`n$reasoning", "Finish My Games - suggestion")
+            continue
+        }
+
+        # Match against categories that already exist in Playnite - try the bare name
+        # and the "🕹️ " Playnite convention, in case Notion doesn't carry the emoji.
+        # Anything that matches neither gets created (with the emoji prefix, unless
+        # the suggested name already has one) rather than blocked - but flagged loudly
+        # so you remember to also add it to the Notion reference afterward.
+        $foundCats = @()
+        $toCreate = @()
+        foreach ($item in $suggestedList) {
+            $cat = Find-Category $item.Name
+            if (-not $cat) { $cat = Find-Category "🕹️ $($item.Name)" }
+            if ($cat) {
+                $foundCats += $cat
+            } else {
+                $effectiveName = if ($item.Name.StartsWith("🕹️")) { $item.Name } else { "🕹️ $($item.Name)" }
+                $toCreate += [PSCustomObject]@{ Name = $item.Name; Description = $item.Description; EffectiveName = $effectiveName }
+            }
+        }
+
+        # Show what "type" categories (🕹️) the game already has before asking what to
+        # do - Humeur (🎭) and Session categories are never touched by this function
+        # either way, only 🕹️ ones are in play for "Remplacer".
+        $currentTypeCats = @()
+        if ($g.CategoryIds) {
+            $currentTypeCats = @($PlayniteApi.Database.Categories | Where-Object { $g.CategoryIds -contains $_.Id -and $_.Name.StartsWith("🕹️") })
+        }
+        $currentNames = if ($currentTypeCats.Count -gt 0) { ($currentTypeCats | ForEach-Object { $_.Name }) -join ', ' } else { "(aucune)" }
+
+        $displayNames = @()
+        $displayNames += ($foundCats | ForEach-Object { $_.Name })
+        $displayNames += ($toCreate | ForEach-Object { $_.EffectiveName })
+        $namesForDisplay = $displayNames -join ', '
+        $msg = "$($g.Name)`n`nCatégories actuelles (🕹️) : $currentNames`n`nCatégories suggérées : $namesForDisplay`n`n$reasoning"
+        if ($toCreate.Count -gt 0) {
+            $msg += "`n`n⚠️ ATTENTION ! Ces catégories n'existent pas encore dans Playnite - elles seront créées si tu choisis Ajouter ou Remplacer. Pense aussi à les ajouter dans la référence Notion :"
+            foreach ($item in $toCreate) {
+                $msg += "`n  - $($item.EffectiveName) : $($item.Description)"
+            }
+        }
+
+        $optAdd = New-Object Playnite.SDK.MessageBoxOption("Ajouter", $true, $false)
+        $optReplace = New-Object Playnite.SDK.MessageBoxOption("Remplacer", $false, $false)
+        $optNothing = New-Object Playnite.SDK.MessageBoxOption("Ne rien faire", $false, $true)
+        $options = New-Object 'System.Collections.Generic.List[Playnite.SDK.MessageBoxOption]'
+        $options.Add($optAdd)
+        $options.Add($optReplace)
+        $options.Add($optNothing)
+
+        $choice = $PlayniteApi.Dialogs.ShowMessage($msg, "Suggestion de catégorie", [System.Windows.MessageBoxImage]::Question, $options)
+
+        if ($null -eq $choice -or $choice.Title -eq "Ne rien faire") { continue }
+
+        $newTypeCatIds = New-Object 'System.Collections.Generic.List[Guid]'
+        foreach ($cat in $foundCats) {
+            if (-not $newTypeCatIds.Contains($cat.Id)) { [void]$newTypeCatIds.Add($cat.Id) }
+        }
+        foreach ($item in $toCreate) {
+            $newCat = Resolve-Category $item.EffectiveName
+            if (-not $newTypeCatIds.Contains($newCat.Id)) { [void]$newTypeCatIds.Add($newCat.Id) }
+        }
+
+        $finalIds = New-Object 'System.Collections.Generic.List[Guid]'
+        if ($choice.Title -eq "Ajouter") {
+            # keep everything the game already has, add the new 🕹️ ones on top
+            if ($g.CategoryIds) { $finalIds.AddRange($g.CategoryIds) }
+            foreach ($id in $newTypeCatIds) {
+                if (-not $finalIds.Contains($id)) { [void]$finalIds.Add($id) }
+            }
+        } else {
+            # Remplacer: drop the game's existing 🕹️ categories, keep everything else
+            # (Humeur, Session, anything non-🕹️) untouched, then add the new 🕹️ set
+            if ($g.CategoryIds) {
+                foreach ($id in $g.CategoryIds) {
+                    $wasCurrentType = $currentTypeCats | Where-Object { $_.Id -eq $id }
+                    if (-not $wasCurrentType) { [void]$finalIds.Add($id) }
+                }
+            }
+            foreach ($id in $newTypeCatIds) {
+                if (-not $finalIds.Contains($id)) { [void]$finalIds.Add($id) }
+            }
+        }
+
+        $g.CategoryIds = $finalIds
+        $PlayniteApi.Database.Games.Update($g)
     }
 }
