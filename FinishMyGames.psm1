@@ -32,6 +32,9 @@ function Get-Cfg {
         #     automatically by your dynamic-rules addon from the fine Catégorie.
         #     Leger has no Notion Genre counterpart (yet?) so stays manual, same
         #     as Session, which has no reliable auto-source either way.
+        #     Missing* are the "🚧 Sans ..." marker categories used by
+        #     Invoke-TagMissingAxes (menu 5) - named here too so both that
+        #     function and the structure-creation step (menu 1) stay in sync.
         Categories = @{
             Action     = "🎭 Action"
             Aventure   = "🎭 Aventure"
@@ -43,6 +46,9 @@ function Get-Cfg {
             SShort     = "⏳ Court"
             SMedium    = "⏳ Moyen"
             SLong      = "⏳ Long"
+            MissingCategorie = "🚧 Sans catégorie"
+            MissingSession   = "🚧 Sans session"
+            MissingHumeur    = "🚧 Sans humeur"
         }
         # --- Tags: nothing lives here right now - reserved for anything outside
         #     the Humeur/Session/Catégorie system, should you need it later.
@@ -218,8 +224,9 @@ function GetMainMenuItems {
     $defs = @(
         @{ D = "1) Create categories/tags + 'Evergreen' status"; F = "Invoke-CreateStructure" },
         @{ D = "2) Create filter presets";                   F = "Invoke-CreatePresets" },
-        @{ D = "3) Count the active shelf";                  F = "Invoke-CountShelf" },
-        @{ D = "4) Set the shelf cap...";                    F = "Invoke-SetShelfCap" }
+        @{ D = "3) Show stats (shelf / evergreen / backlog)"; F = "Invoke-ShowStats" },
+        @{ D = "4) Set the shelf cap...";                    F = "Invoke-SetShelfCap" },
+        @{ D = "5) Mark games missing Categorie/Session/Humeur"; F = "Invoke-TagMissingAxes" }
     )
 
     $items = @()
@@ -231,6 +238,80 @@ function GetMainMenuItems {
         $items += $mi
     }
     return $items
+}
+
+# ---------------------------------------------------------------------------
+#  5) Tag every game missing one of the three multi-valued category systems
+#     - 🕹️ Categorie, ⏳ Session, 🎭 Humeur - each with its own standalone
+#     marker, in a single pass, so Playnite's native filter becomes usable
+#     to find and work through them. A game missing 🎭 Humeur despite
+#     already having a 🕹️ Categorie is worth a second look - Humeur should
+#     get populated automatically by the dynamic-rules addon once a
+#     Categorie is set (except Leger, which stays manual), so seeing one
+#     here points at a gap in that automation rather than something to fix
+#     by hand. Same demos/playtests + Hidden exclusion throughout.
+#     Idempotent - safe to rerun any time, only currently-missing games get
+#     (re-)tagged; already-sessioned/categorie'd/humeur'd games are left
+#     alone.
+# ---------------------------------------------------------------------------
+
+function Invoke-TagMissingAxes {
+    param($actionArgs)
+    $c = Get-Cfg
+
+    $demoCatIds = @($PlayniteApi.Database.Categories | Where-Object { $_.Name.StartsWith("🧪") } | ForEach-Object { $_.Id })
+
+    $axes = @(
+        @{ Prefix = "🕹️"; MarkerName = $c.Categories.MissingCategorie },
+        @{ Prefix = "⏳"; MarkerName = $c.Categories.MissingSession },
+        @{ Prefix = "🎭"; MarkerName = $c.Categories.MissingHumeur }
+    )
+    foreach ($axis in $axes) {
+        $axis.PrefixCatIds = @($PlayniteApi.Database.Categories | Where-Object { $_.Name.StartsWith($axis.Prefix) } | ForEach-Object { $_.Id })
+        $axis.Marker = Resolve-Category $axis.MarkerName
+        $axis.Tagged = 0
+    }
+
+    foreach ($g in $PlayniteApi.Database.Games) {
+        if ($g.Hidden) { continue }
+
+        $isDemo = $false
+        if ($g.CategoryIds) {
+            foreach ($id in $g.CategoryIds) {
+                if ($demoCatIds -contains $id) { $isDemo = $true; break }
+            }
+        }
+        if ($isDemo) { continue }
+
+        $currentIds = if ($g.CategoryIds) { @($g.CategoryIds) } else { @() }
+        $newIds = $null
+
+        foreach ($axis in $axes) {
+            $hasAxis = $false
+            foreach ($id in $currentIds) {
+                if ($axis.PrefixCatIds -contains $id) { $hasAxis = $true; break }
+            }
+            if ($hasAxis) { continue }
+            if ($currentIds -notcontains $axis.Marker.Id) {
+                if ($null -eq $newIds) {
+                    $newIds = New-Object 'System.Collections.Generic.List[Guid]'
+                    foreach ($id in $currentIds) { [void]$newIds.Add($id) }
+                }
+                [void]$newIds.Add($axis.Marker.Id)
+                $currentIds = @($newIds)
+                $axis.Tagged++
+            }
+        }
+
+        if ($null -ne $newIds) {
+            $g.CategoryIds = $newIds
+            $PlayniteApi.Database.Games.Update($g)
+        }
+    }
+
+    $lines = foreach ($axis in $axes) { "  - $($axis.MarkerName) : $($axis.Tagged)" }
+    $msg = "Marquage termine.`n`n" + ($lines -join "`n") + "`n`nFiltre dans Playnite sur chacune de ces categories pour retrouver les jeux concernes."
+    $PlayniteApi.Dialogs.ShowMessage($msg, "Finish My Games - marquage manquants")
 }
 
 # ---------------------------------------------------------------------------
@@ -249,6 +330,9 @@ function Invoke-CreateStructure {
     )
     foreach ($cat in $cats) { [void](Resolve-Category $cat) }
 
+    $markerCats = @($c.Categories.MissingCategorie, $c.Categories.MissingSession, $c.Categories.MissingHumeur)
+    foreach ($cat in $markerCats) { [void](Resolve-Category $cat) }
+
     $tags = @($c.Tags.Values)
     foreach ($t in $tags) { [void](Resolve-Tag $t) }
 
@@ -257,7 +341,8 @@ function Invoke-CreateStructure {
     foreach ($s in $needed) { if ($null -eq (Find-Status $s)) { $missing += $s } }
 
     $msg = "Done.`n`nCreated status (or already present): $($c.Status.Evergreen)`n" +
-           "Created categories (or already present):`n  " + ($cats -join ", ")
+           "Created categories (or already present):`n  " + ($cats -join ", ") +
+           "`n`nCreated marker categories for menu 5) (or already present):`n  " + ($markerCats -join ", ")
     if ($tags.Count -gt 0) {
         $msg += "`n" + "Created tags (or already present):`n  " + ($tags -join ", ")
     }
@@ -320,25 +405,48 @@ function Invoke-CreatePresets {
 }
 
 # ---------------------------------------------------------------------------
-#  3) Count the active shelf
+#  3) A few stats about the FinishMyGames system: shelf occupancy vs the
+#     cap (with the roster, like the old shelf-count did), evergreen count,
+#     and backlog size (Backlog + En pause combined, matching how the
+#     "Backlog" filter preset groups them).
 # ---------------------------------------------------------------------------
 
-function Invoke-CountShelf {
+function Invoke-ShowStats {
     param($actionArgs)
     $c = Get-Cfg
+
     $shelf = Find-Status $c.Status.Shelf
-    if ($null -eq $shelf) {
-        $PlayniteApi.Dialogs.ShowMessage("Status '$($c.Status.Shelf)' not found. Fix the name in Get-Cfg or Playnite.", "Finish My Games")
+    $evergreen = Find-Status $c.Status.Evergreen
+    $backlog = Find-Status $c.Status.Backlog
+    $hold = Find-Status $c.Status.Hold
+
+    $missing = @()
+    if ($null -eq $shelf) { $missing += $c.Status.Shelf }
+    if ($null -eq $evergreen) { $missing += $c.Status.Evergreen }
+    if ($null -eq $backlog) { $missing += $c.Status.Backlog }
+    if ($null -eq $hold) { $missing += $c.Status.Hold }
+    if ($missing.Count -gt 0) {
+        $PlayniteApi.Dialogs.ShowMessage("Status introuvable(s) : $($missing -join ', ').`nCorrige le nom dans Get-Cfg ou dans Playnite.", "Finish My Games")
         return
     }
 
     $cap = Get-Cap
-    $actives = $PlayniteApi.Database.Games | Where-Object { $_.CompletionStatusId -eq $shelf.Id }
-    $n = @($actives).Count
-    $list = (@($actives) | ForEach-Object { "  - " + $_.Name }) -join "`n"
-    $verdict = if ($n -le $cap) { "OK, you're within the cap of $cap." } else { "OVER the cap of $cap - retire one before adding a new one." }
+    $shelfGames = @($PlayniteApi.Database.Games | Where-Object { $_.CompletionStatusId -eq $shelf.Id })
+    $shelfN = $shelfGames.Count
+    $shelfList = ($shelfGames | ForEach-Object { "  - " + $_.Name }) -join "`n"
+    $shelfVerdict = if ($shelfN -le $cap) { "OK, dans le plafond." } else { "AU-DESSUS du plafond - il faut en retirer un avant d'en ajouter un nouveau." }
 
-    $PlayniteApi.Dialogs.ShowMessage("Active shelf: $n game(s) '$($c.Status.Shelf)'.`n`n$list`n`n$verdict", "Finish My Games - shelf")
+    $evergreenN = @($PlayniteApi.Database.Games | Where-Object { $_.CompletionStatusId -eq $evergreen.Id }).Count
+
+    $backlogN = @($PlayniteApi.Database.Games | Where-Object { $_.CompletionStatusId -eq $backlog.Id }).Count
+    $holdN = @($PlayniteApi.Database.Games | Where-Object { $_.CompletionStatusId -eq $hold.Id }).Count
+    $backlogTotal = $backlogN + $holdN
+
+    $msg = "Étagère : $shelfN / $cap places. $shelfVerdict`n$shelfList`n`n" +
+           "Evergreen : $evergreenN jeux`n`n" +
+           "Backlog : $backlogTotal jeux ($backlogN en Backlog, $holdN en pause)"
+
+    $PlayniteApi.Dialogs.ShowMessage($msg, "Finish My Games - stats")
 }
 
 # ---------------------------------------------------------------------------
