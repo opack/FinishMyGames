@@ -33,8 +33,9 @@ function Get-Cfg {
         #     Leger has no Notion Genre counterpart (yet?) so stays manual, same
         #     as Session, which has no reliable auto-source either way.
         #     Missing* are the "🚧 Sans ..." marker categories used by
-        #     Invoke-TagMissingAxes (menu 5) - named here too so both that
-        #     function and the structure-creation step (menu 1) stay in sync.
+        #     Invoke-TagMissingAxes ("Marquer les jeux non catégorisés") -
+        #     named here too so both that function and the structure-creation
+        #     step ("Configuration") stay in sync.
         Categories = @{
             Action     = "🎭 Action"
             Aventure   = "🎭 Aventure"
@@ -53,6 +54,13 @@ function Get-Cfg {
         # --- Tags: nothing lives here right now - reserved for anything outside
         #     the Humeur/Session/Catégorie system, should you need it later.
         Tags = @{
+        }
+        # --- Features: native Playnite "Feature" field (distinct from Categories/Tags).
+        #     Demo is set by Steam import (or by hand) on playtest/demo entries and is
+        #     the reliable signal to exclude them from the missing-axis marking pass -
+        #     unlike Categories, it isn't something this script or Notion manages.
+        Features = @{
+            Demo = "Démo"
         }
         # --- Filter presets: Name + which statuses/categories/tags to filter, by
         #     KEY from Status/Categories/Tags above. Add / remove / rename freely.
@@ -137,6 +145,12 @@ function Resolve-Category {
     return $existing
 }
 
+function Find-Feature {
+    param([string]$Name)
+    $target = Get-NormalizedName $Name
+    return $PlayniteApi.Database.Features | Where-Object { (Get-NormalizedName $_.Name) -eq $target } | Select-Object -First 1
+}
+
 function New-IdFilter {
     param([Guid[]]$Ids)
     $list = New-Object 'System.Collections.Generic.List[Guid]'
@@ -184,7 +198,7 @@ function Set-GameStatus {
     param($Game, [string]$StatusName)
     $st = Find-Status $StatusName
     if ($null -eq $st) {
-        $PlayniteApi.Dialogs.ShowMessage("Status '$StatusName' not found. Check the names in Get-Cfg vs Playnite.", "Finish My Games")
+        $PlayniteApi.Dialogs.ShowMessage("Statut '$StatusName' introuvable. Vérifie les noms dans Get-Cfg et dans Playnite.", "Finish My Games")
         return $false
     }
     $Game.CompletionStatusId = $st.Id
@@ -222,11 +236,10 @@ function GetMainMenuItems {
 
     $section = "@|Finish My Games"
     $defs = @(
-        @{ D = "1) Create categories/tags + 'Evergreen' status"; F = "Invoke-CreateStructure" },
-        @{ D = "2) Create filter presets";                   F = "Invoke-CreatePresets" },
-        @{ D = "3) Show stats (shelf / evergreen / backlog)"; F = "Invoke-ShowStats" },
-        @{ D = "4) Set the shelf cap...";                    F = "Invoke-SetShelfCap" },
-        @{ D = "5) Mark games missing Categorie/Session/Humeur"; F = "Invoke-TagMissingAxes" }
+        @{ D = "Configuration";                    F = "Invoke-CreateStructure" },
+        @{ D = "Taille de l'étagère";               F = "Invoke-SetShelfCap" },
+        @{ D = "Statistiques";                      F = "Invoke-ShowStats" },
+        @{ D = "Marquer les jeux non catégorisés"; F = "Invoke-TagMissingAxes" }
     )
 
     $items = @()
@@ -241,25 +254,26 @@ function GetMainMenuItems {
 }
 
 # ---------------------------------------------------------------------------
-#  5) Tag every game missing one of the three multi-valued category systems
-#     - 🕹️ Categorie, ⏳ Session, 🎭 Humeur - each with its own standalone
-#     marker, in a single pass, so Playnite's native filter becomes usable
-#     to find and work through them. A game missing 🎭 Humeur despite
-#     already having a 🕹️ Categorie is worth a second look - Humeur should
-#     get populated automatically by the dynamic-rules addon once a
-#     Categorie is set (except Leger, which stays manual), so seeing one
-#     here points at a gap in that automation rather than something to fix
-#     by hand. Same demos/playtests + Hidden exclusion throughout.
-#     Idempotent - safe to rerun any time, only currently-missing games get
-#     (re-)tagged; already-sessioned/categorie'd/humeur'd games are left
-#     alone.
+#  "Marquer les jeux non catégorisés": tag every game missing one of the
+#     three multi-valued category systems - 🕹️ Categorie, ⏳ Session,
+#     🎭 Humeur - each with its own standalone marker, in a single pass, so
+#     Playnite's native filter becomes usable to find and work through them.
+#     A game missing 🎭 Humeur despite already having a 🕹️ Categorie is worth
+#     a second look - Humeur should get populated automatically by the
+#     dynamic-rules addon once a Categorie is set (except Leger, which stays
+#     manual), so seeing one here points at a gap in that automation rather
+#     than something to fix by hand. Same demos/playtests + Hidden exclusion
+#     throughout. Idempotent - safe to rerun any time, only currently-missing
+#     games get (re-)tagged; already-sessioned/categorie'd/humeur'd games are
+#     left alone.
 # ---------------------------------------------------------------------------
 
 function Invoke-TagMissingAxes {
     param($actionArgs)
     $c = Get-Cfg
 
-    $demoCatIds = @($PlayniteApi.Database.Categories | Where-Object { $_.Name.StartsWith("🧪") } | ForEach-Object { $_.Id })
+    $demoFeature = Find-Feature $c.Features.Demo
+    $demoFeatureId = if ($demoFeature) { $demoFeature.Id } else { $null }
 
     $axes = @(
         @{ Prefix = "🕹️"; MarkerName = $c.Categories.MissingCategorie },
@@ -275,12 +289,7 @@ function Invoke-TagMissingAxes {
     foreach ($g in $PlayniteApi.Database.Games) {
         if ($g.Hidden) { continue }
 
-        $isDemo = $false
-        if ($g.CategoryIds) {
-            foreach ($id in $g.CategoryIds) {
-                if ($demoCatIds -contains $id) { $isDemo = $true; break }
-            }
-        }
+        $isDemo = ($null -ne $demoFeatureId) -and $g.FeatureIds -and ($g.FeatureIds -contains $demoFeatureId)
         if ($isDemo) { continue }
 
         $currentIds = if ($g.CategoryIds) { @($g.CategoryIds) } else { @() }
@@ -310,12 +319,15 @@ function Invoke-TagMissingAxes {
     }
 
     $lines = foreach ($axis in $axes) { "  - $($axis.MarkerName) : $($axis.Tagged)" }
-    $msg = "Marquage termine.`n`n" + ($lines -join "`n") + "`n`nFiltre dans Playnite sur chacune de ces categories pour retrouver les jeux concernes."
+    $msg = "Marquage terminé.`n`n" + ($lines -join "`n") + "`n`nFiltre dans Playnite sur chacune de ces catégories pour retrouver les jeux concernés."
     $PlayniteApi.Dialogs.ShowMessage($msg, "Finish My Games - marquage manquants")
 }
 
 # ---------------------------------------------------------------------------
-#  1) Structure: mood/session categories + tags + the 'evergreen' status
+#  "Configuration": mood/session categories + tags + the 'evergreen' status,
+#     plus filter presets (folded in from the old standalone presets step).
+#     Idempotent - safe to rerun any time, including after adding a new
+#     Categorie.
 # ---------------------------------------------------------------------------
 
 function Invoke-CreateStructure {
@@ -340,75 +352,69 @@ function Invoke-CreateStructure {
     $missing = @()
     foreach ($s in $needed) { if ($null -eq (Find-Status $s)) { $missing += $s } }
 
-    $msg = "Done.`n`nCreated status (or already present): $($c.Status.Evergreen)`n" +
-           "Created categories (or already present):`n  " + ($cats -join ", ") +
-           "`n`nCreated marker categories for menu 5) (or already present):`n  " + ($markerCats -join ", ")
+    $msg = "Terminé.`n`nStatut créé (ou déjà présent) : $($c.Status.Evergreen)`n" +
+           "Catégories créées (ou déjà présentes) :`n  " + ($cats -join ", ") +
+           "`n`nCatégories marqueurs créées pour 'Marquer les jeux non catégorisés' (ou déjà présentes) :`n  " + ($markerCats -join ", ")
     if ($tags.Count -gt 0) {
-        $msg += "`n" + "Created tags (or already present):`n  " + ($tags -join ", ")
+        $msg += "`n" + "Tags créés (ou déjà présents) :`n  " + ($tags -join ", ")
     }
     if ($missing.Count -gt 0) {
-        $msg += "`n`nWARNING - these statuses (from Get-Cfg) were NOT found in Playnite:`n  " + ($missing -join ", ") +
-                "`nRename them in Playnite to match, or fix the names in Get-Cfg."
+        $msg += "`n`nATTENTION - ces statuts (définis dans Get-Cfg) sont introuvables dans Playnite :`n  " + ($missing -join ", ") +
+                "`nRenomme-les dans Playnite pour qu'ils correspondent, ou corrige les noms dans Get-Cfg."
     }
-    $msg += "`n`nNext: Session and Léger categories are manual - assign them yourself, no reliable auto-source exists. " +
-            "The other Humeur categories (Action/Aventure/Gestion/Réflexion/Détente/Simulation) get populated automatically by your dynamic-rules addon once a game has a fine Catégorie - nothing to do by hand there."
-    $PlayniteApi.Dialogs.ShowMessage($msg, "Finish My Games - structure")
-}
 
-# ---------------------------------------------------------------------------
-#  2) Filter presets
-# ---------------------------------------------------------------------------
-
-function Invoke-CreatePresets {
-    param($actionArgs)
-    $c = Get-Cfg
-
+    # --- Filter presets: folded in from the old standalone presets step. Needs the Shelf
+    #     status to already exist in Playnite (a base Kanban column you set up by hand,
+    #     not something this function creates). If it's missing, skip presets instead of
+    #     hard-failing - the category/tag/status work above is still valid on its own.
     if ($null -eq (Find-Status $c.Status.Shelf)) {
-        $PlayniteApi.Dialogs.ShowMessage("Status '$($c.Status.Shelf)' not found. Fix the name in Get-Cfg or in Playnite first.", "Finish My Games")
-        return
-    }
+        $msg += "`n`nPresets de filtres non créés - statut '$($c.Status.Shelf)' introuvable. Corrige le nom dans Get-Cfg ou dans Playnite, puis relance."
+    } else {
+        $created = @()
+        $skipped = @()
 
-    $created = @()
-    $skipped = @()
+        foreach ($p in $c.Presets) {
+            $settings = New-Object Playnite.SDK.Models.FilterPresetSettings
+            $hasFilter = $false
 
-    foreach ($p in $c.Presets) {
-        $settings = New-Object Playnite.SDK.Models.FilterPresetSettings
-        $hasFilter = $false
+            if ($p.ContainsKey("Status") -and @($p.Status).Count -gt 0) {
+                $sids = @()
+                foreach ($k in $p.Status) { $st = Find-Status $c.Status[$k]; if ($st) { $sids += $st.Id } }
+                if ($sids.Count -gt 0) { $settings.CompletionStatuses = New-IdFilter $sids; $hasFilter = $true }
+            }
 
-        if ($p.ContainsKey("Status") -and @($p.Status).Count -gt 0) {
-            $sids = @()
-            foreach ($k in $p.Status) { $st = Find-Status $c.Status[$k]; if ($st) { $sids += $st.Id } }
-            if ($sids.Count -gt 0) { $settings.CompletionStatuses = New-IdFilter $sids; $hasFilter = $true }
+            if ($p.ContainsKey("Categories") -and @($p.Categories).Count -gt 0) {
+                $cids = @()
+                foreach ($k in $p.Categories) { $nm = $c.Categories[$k]; if ($nm) { $cg = Resolve-Category $nm; $cids += $cg.Id } }
+                if ($cids.Count -gt 0) { $settings.Category = New-IdFilter $cids; $hasFilter = $true }
+            }
+
+            if ($p.ContainsKey("Tags") -and @($p.Tags).Count -gt 0) {
+                $tids = @()
+                foreach ($k in $p.Tags) { $nm = $c.Tags[$k]; if ($nm) { $tg = Resolve-Tag $nm; $tids += $tg.Id } }
+                if ($tids.Count -gt 0) { $settings.Tag = New-IdFilter $tids; $hasFilter = $true }
+            }
+
+            if ($hasFilter) { [void](Resolve-Preset $p.Name $settings $p.Group $p.Sort $p.SortDir); $created += $p.Name }
+            else { $skipped += $p.Name }
         }
 
-        if ($p.ContainsKey("Categories") -and @($p.Categories).Count -gt 0) {
-            $cids = @()
-            foreach ($k in $p.Categories) { $nm = $c.Categories[$k]; if ($nm) { $cg = Resolve-Category $nm; $cids += $cg.Id } }
-            if ($cids.Count -gt 0) { $settings.Category = New-IdFilter $cids; $hasFilter = $true }
+        $msg += "`n`nPresets créés (ou déjà présents) :`n  " + ($created -join "`n  ")
+        if ($skipped.Count -gt 0) {
+            $msg += "`n`nPresets non créés (aucun statut/catégorie/tag correspondant - vérifie les clés dans Get-Cfg.Presets) :`n  " + ($skipped -join ", ")
         }
-
-        if ($p.ContainsKey("Tags") -and @($p.Tags).Count -gt 0) {
-            $tids = @()
-            foreach ($k in $p.Tags) { $nm = $c.Tags[$k]; if ($nm) { $tg = Resolve-Tag $nm; $tids += $tg.Id } }
-            if ($tids.Count -gt 0) { $settings.Tag = New-IdFilter $tids; $hasFilter = $true }
-        }
-
-        if ($hasFilter) { [void](Resolve-Preset $p.Name $settings $p.Group $p.Sort $p.SortDir); $created += $p.Name }
-        else { $skipped += $p.Name }
     }
 
-    $msg = "Presets created (or already present):`n  " + ($created -join "`n  ")
-    if ($skipped.Count -gt 0) {
-        $msg += "`n`nSkipped (no matching status/category/tag - check the keys in Get-Cfg.Presets):`n  " + ($skipped -join ", ")
-    }
-    $PlayniteApi.Dialogs.ShowMessage($msg, "Finish My Games - presets")
+    $msg += "`n`nÀ faire ensuite : les catégories Session et Léger sont manuelles - à assigner toi-même, aucune source fiable ne permet de les automatiser. " +
+            "Les autres catégories Humeur (Action/Aventure/Gestion/Réflexion/Détente/Simulation) sont peuplées automatiquement par ton add-on de règles dynamiques dès qu'un jeu a une Catégorie fine - rien à faire à la main pour celles-ci."
+    $PlayniteApi.Dialogs.ShowMessage($msg, "Finish My Games - configuration")
 }
 
 # ---------------------------------------------------------------------------
-#  3) A few stats about the FinishMyGames system: shelf occupancy vs the
-#     cap (with the roster, like the old shelf-count did), evergreen count,
-#     and backlog size (Backlog + En pause combined, matching how the
-#     "Backlog" filter preset groups them).
+#  "Statistiques": a few stats about the FinishMyGames system - shelf
+#     occupancy vs the cap (with the roster), evergreen count, and backlog
+#     size (Backlog + En pause combined, matching how the "Backlog" filter
+#     preset groups them).
 # ---------------------------------------------------------------------------
 
 function Invoke-ShowStats {
@@ -426,7 +432,7 @@ function Invoke-ShowStats {
     if ($null -eq $backlog) { $missing += $c.Status.Backlog }
     if ($null -eq $hold) { $missing += $c.Status.Hold }
     if ($missing.Count -gt 0) {
-        $PlayniteApi.Dialogs.ShowMessage("Status introuvable(s) : $($missing -join ', ').`nCorrige le nom dans Get-Cfg ou dans Playnite.", "Finish My Games")
+        $PlayniteApi.Dialogs.ShowMessage("Statut(s) introuvable(s) : $($missing -join ', ').`nCorrige le(s) nom(s) dans Get-Cfg ou dans Playnite.", "Finish My Games")
         return
     }
 
@@ -450,20 +456,20 @@ function Invoke-ShowStats {
 }
 
 # ---------------------------------------------------------------------------
-#  4) Set the shelf cap
+#  "Taille de l'étagère": set the shelf cap
 # ---------------------------------------------------------------------------
 
 function Invoke-SetShelfCap {
     param($actionArgs)
     $cur = Get-Cap
-    $res = $PlayniteApi.Dialogs.SelectString("Max number of games on the active shelf:", "Shelf cap", $cur.ToString())
+    $res = $PlayniteApi.Dialogs.SelectString("Nombre maximum de jeux sur l'étagère active :", "Taille de l'étagère", $cur.ToString())
     if ($res.Result) {
         $n = 0
         if ([int]::TryParse($res.SelectedString.Trim(), [ref]$n) -and $n -gt 0) {
             Set-Cap $n
-            $PlayniteApi.Dialogs.ShowMessage("Shelf cap set to $n.", "Setting")
+            $PlayniteApi.Dialogs.ShowMessage("Taille de l'étagère réglée sur $n.", "Réglage")
         } else {
-            $PlayniteApi.Dialogs.ShowMessage("Invalid value (expected an integer > 0).", "Setting")
+            $PlayniteApi.Dialogs.ShowMessage("Valeur invalide (un entier > 0 est attendu).", "Réglage")
         }
     }
 }
@@ -480,7 +486,7 @@ function GetGameMenuItems {
 
     $section = "Finish My Games"
     $defs = @(
-        @{ D = "Put on shelf (respects the cap)"; F = "Invoke-SetShelf" },
+        @{ D = "Mettre sur l'étagère";             F = "Invoke-SetShelf" },
         @{ D = "Suggérer une catégorie (Claude)"; F = "Invoke-SuggestCategory" }
     )
 
@@ -502,7 +508,7 @@ function Invoke-SetShelf {
     $cap = Get-Cap
     $shelf = Find-Status $c.Status.Shelf
     if ($null -eq $shelf) {
-        $PlayniteApi.Dialogs.ShowMessage("Status '$($c.Status.Shelf)' not found. Fix Get-Cfg.", "Finish My Games")
+        $PlayniteApi.Dialogs.ShowMessage("Statut '$($c.Status.Shelf)' introuvable. Corrige Get-Cfg.", "Finish My Games")
         return
     }
     $count = Get-ShelfCount
@@ -510,14 +516,14 @@ function Invoke-SetShelf {
     foreach ($g in $games) {
         if ($g.CompletionStatusId -eq $shelf.Id) { continue }
         if ($count -ge $cap) {
-            $PlayniteApi.Dialogs.ShowMessage("Shelf full ($count/$cap). Retire a game before adding.", "Shelf full")
+            $PlayniteApi.Dialogs.ShowMessage("Étagère pleine ($count/$cap). Retire un jeu avant d'en ajouter un nouveau.", "Étagère pleine")
             break
         }
         [void](Set-GameStatus $g $c.Status.Shelf)
         $count++; $added++
     }
     if ($added -gt 0) {
-        $PlayniteApi.Dialogs.ShowMessage("$added game(s) put on the shelf. Shelf: $count/$cap.", "Shelf")
+        $PlayniteApi.Dialogs.ShowMessage("$added jeu(x) mis sur l'étagère. Étagère : $count/$cap.", "Étagère")
     }
 }
 
@@ -549,7 +555,7 @@ function Invoke-SuggestCategory {
     # explain a call that works standalone but not wrapped in the progress overlay.
     $claudeCmd = Get-Command claude -ErrorAction SilentlyContinue
     if (-not $claudeCmd) {
-        $PlayniteApi.Dialogs.ShowMessage("'claude' introuvable dans le PATH de ce contexte. Verifie l'installation de Claude Code.", "Finish My Games - suggestion")
+        $PlayniteApi.Dialogs.ShowMessage("'claude' introuvable dans le PATH de ce contexte. Vérifie l'installation de Claude Code.", "Finish My Games - suggestion")
         return
     }
     $claudePath = $claudeCmd.Source
@@ -586,7 +592,7 @@ function Invoke-SuggestCategory {
         $raw = $stdinContent | & $claudePath -p $promptArg --output-format json --dangerously-skip-permissions 2>&1
 
         if ($null -eq $raw -or [string]::IsNullOrWhiteSpace(($raw -join "`n"))) {
-            $PlayniteApi.Dialogs.ShowMessage("Pas de sortie du tout pour '$($g.Name)'. Verifie que 'claude' est installe, connecte, et dans le PATH.", "Finish My Games - suggestion")
+            $PlayniteApi.Dialogs.ShowMessage("Pas de sortie du tout pour '$($g.Name)'. Vérifie que 'claude' est installé, connecté, et dans le PATH.", "Finish My Games - suggestion")
             continue
         }
 
