@@ -86,7 +86,7 @@ function Get-Cfg {
             @{ Name = "🎭 Réflexion";   Status = @("Shelf","Evergreen"); Categories = @("Reflexion"); Group = "CompletionStatus" },
             @{ Name = "🎭 Détente";     Status = @("Shelf","Evergreen"); Categories = @("Detente"); Group = "CompletionStatus" },
             @{ Name = "🎭 Simulation";  Status = @("Shelf","Evergreen"); Categories = @("Simulation"); Group = "CompletionStatus" },
-            @{ Name = "📥 Backlog";     Status = @("Backlog","Hold"); Group = "CompletionStatus"; Sort = "Playtime"; SortDir = "Descending" }
+            @{ Name = "📥 Backlog";     Status = @("Backlog","Hold","NotYet"); Group = "CompletionStatus"; Sort = "Playtime"; SortDir = "Descending" }
         )
     }
 }
