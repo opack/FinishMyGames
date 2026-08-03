@@ -543,10 +543,33 @@ function Invoke-SuggestCategory {
     # a short, plain string and piping the rest via stdin (the documented
     # "cat file | claude -p ..." pattern) sidesteps that entirely.
     #
-    # NOTE: PowerShell decodes an external process's stdout/stdin using the console's
-    # OutputEncoding, which on Windows is usually a legacy codepage, not UTF-8 - so
-    # accents come back mangled ("Ã©" instead of "é") unless we force it here.
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    # NOTE: PowerShell decodes a native command's captured stdout using
+    # [Console]::OutputEncoding, REGARDLESS of whether that output is captured
+    # into a variable or redirected to a file (tried the file-redirect route
+    # first - still mangled, since it's decoded the same way either way). A
+    # legacy Windows codepage there mangles accents ("Ã©" instead of "é")
+    # unless we force it to UTF-8. Setting it throws "Invalid handle" when
+    # there's no console attached to the process - exactly Playnite's case,
+    # which hosts this script in-process with no console window. Fix:
+    # allocate a hidden console just so the assignment has a valid handle to
+    # work with, then hide its window immediately (nothing visible ever
+    # appears). This restores the standard [Console]::OutputEncoding fix
+    # instead of fighting PowerShell's native-command capture pipeline.
+    if (-not ([System.Management.Automation.PSTypeName]'FinishMyGames.Win32Console').Type) {
+        Add-Type -Namespace FinishMyGames -Name Win32Console -MemberDefinition @'
+[DllImport("kernel32.dll")] public static extern bool AllocConsole();
+[DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
+[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+'@
+    }
+    try {
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    } catch {
+        [void][FinishMyGames.Win32Console]::AllocConsole()
+        $hwnd = [FinishMyGames.Win32Console]::GetConsoleWindow()
+        if ($hwnd -ne [IntPtr]::Zero) { [void][FinishMyGames.Win32Console]::ShowWindow($hwnd, 0) } # SW_HIDE
+        try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
+    }
 
     # Resolve the full path to 'claude' HERE, in the function's normal execution
     # context (the one that's proven to work), rather than relying on a PATH lookup
