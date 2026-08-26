@@ -56,6 +56,20 @@ Cette modification nécessite le redémarrage de Playnite.
    > ⚠️ `FinishMyGames.psm1` est en **UTF-8 avec BOM**. Ne pas le ré-enregistrer dans un éditeur qui retire le BOM : PowerShell lirait mal le fichier et les emojis casseraient le chargement de l'extension.
 3. Redémarrer Playnite
 4. Pour l'action « Suggérer une catégorie (Claude) » : copier `skills/playnite-categorize/SKILL.md` vers `%USERPROFILE%\.claude\skills\playnite-categorize\SKILL.md`.
+5. Toujours pour « Suggérer une catégorie (Claude) » : comme Playnite lance le script hors de tout terminal, une session `claude` classique (`/login`) finit par expirer sans pouvoir se rafraîchir seule, avec l'erreur `Failed to authenticate: OAuth session expired and could not be refreshed`. Générer un jeton de longue durée à la place :
+   1. Dans un terminal Windows, `claude setup-token` (autorisation unique via le navigateur, jeton valable environ un an).
+   2. Rendre ce jeton disponible à Playnite via une variable d'environnement utilisateur persistante en exécutant la commande suivante dans le terminal Windows :
+      ```
+      setx CLAUDE_CODE_OAUTH_TOKEN "<jeton>"
+      ```
+   3. Redémarrer Playnite pour qu'il hérite de la nouvelle variable.
+
+   > Le jeton étant valable environ un an, cette étape n'est à refaire qu'occasionnellement, pas à chaque session — mais elle reste à refaire un jour, ce n'est pas définitif.
+
+6. Toujours pour « Suggérer une catégorie (Claude) » : la skill lit la page Notion de référence via le connecteur Notion (`notion-fetch`). Un connecteur lié au compte claude.ai (celui utilisé via l'interface web) n'est pas accessible avec `CLAUDE_CODE_OAUTH_TOKEN`, qui ne donne accès qu'aux requêtes du modèle. Il faut donc l'ajouter comme serveur MCP indépendant, en **scope utilisateur** (le scope par défaut, local, est lié au répertoire de travail où la commande est lancée et resterait invisible pour le processus headless que Playnite exécute depuis un autre répertoire) :
+   1. Dans un terminal Windows : `claude mcp add --transport http notion https://mcp.notion.com/mcp --scope user`
+   2. Compléter l'autorisation Notion demandée (via `/mcp` dans une session interactive `claude`, ou directement au moment de l'ajout) — autorisation séparée de celle du compte Claude, propre à ce serveur MCP.
+   3. Vérifier avec `claude mcp list` que Notion apparaît bien `Connected`.
 
 ## Utilisation
 
@@ -71,7 +85,7 @@ Cette modification nécessite le redémarrage de Playnite.
 ### Actions du menu principal
 
 | Action                           | Rôle                                                                                                                                                                                                                                                                                                            |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Configuration                    | Crée le statut `🎮 Evergreen`, les Catégories Humeur/Session, les 3 marqueurs `Sans...`, et les filter presets. Idempotent — se relance sans risque, y compris après l'ajout d'une nouvelle Catégorie 🕹️.                                                                                                       |
 | Taille de l'étagère              | Change la taille de l'étagère.                                                                                                                                                                                                                                                                                  |
 | Statistiques                     | Nombre de jeux sur l'étagère / places disponibles (avec la liste), nombre de jeux Evergreen, taille du backlog (`Backlog` + `En pause` combinés).                                                                                                                                                               |
@@ -92,3 +106,4 @@ Tout le reste (finir, abandonner, mettre en pause, passer en Evergreen…) n'est
 - `skills/playnite-categorize/SKILL.md` — la skill Claude Code utilisée par « Suggérer une catégorie (Claude) », versionnée ici pour pouvoir la réinstaller si besoin (voir Installation).
 
 ---
+
