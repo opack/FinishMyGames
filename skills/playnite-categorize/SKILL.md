@@ -45,11 +45,12 @@ The page has three tables:
   Simulation). Not this skill's output, but useful context for sanity-checking a call.
 - **Fonctionnalités** — objective mechanical facts (Roguelite, MMO, Couch-gaming, PvP...).
   These map to Playnite *Features*, not *Categories* — ignore them for this skill's output.
-- **Catégorie** — the real target list, roughly 53 fine-grained values, each with a
-  **Description** and a **Mots-clé** column. This is what you're matching the game against.
-  (Table title as of the last correction: "Catégorie", with the accent — the earlier
-  "Categorie" spelling was a typo Didier fixed in Notion, so match on the table's
-  position/content rather than hardcoding an exact title string, in case it's edited again.)
+- **Catégorie** — the real target list, roughly 55+ fine-grained values with a one-line
+  **Description**, a **Mots-clé** column, and an **Humeur** each. This is what you're
+  matching the game against. (Table title as of the last correction: "Catégorie", with the
+  accent — the earlier "Categorie" spelling was a typo Didier fixed in Notion, so match on
+  the table's position/content rather than hardcoding an exact title string, in case it's
+  edited again.)
 
 **Use the Mots-clé column as a supporting signal, not a search target.** It exists to
 surface the main ideas behind a category in a few words, and sometimes it genuinely names
@@ -106,6 +107,9 @@ Claude arrived at together, working through concrete cases, in order of importan
    (structure: rooms explored floor by floor) and Hack'n slash (loop: loot/stats against
    hordes) can both legitimately apply to the same game. Two categories whose definitions
    largely restate each other should not both go on — pick the one that's the real driver.
+   This same "two names for the same thing" test applies to a *proposed new* category too
+   (see rule 8) — a new name that just rephrases an existing definition is a duplicate, not
+   a discovery.
 
 5. **A card-based game that doesn't build or evolve its deck over a run is "Cartes", not
    "Deckbuilding".** Check the exact current wording of both definitions fetched in Step 1
@@ -138,22 +142,70 @@ Claude arrived at together, working through concrete cases, in order of importan
    bar for an addition even without a second source confirming it; a bare intuition with
    nothing citable behind it doesn't.
 
+8. **Don't stretch a mediocre fit just because it's on the list — but don't invent casually,
+   and never invent a near-duplicate of something that already fits.** Two checks, in order,
+   before you ever propose something new:
+
+   a. *Is the gap real?* Does your best existing-category match actually describe what's
+      foregrounded here, or does it just overlap a bit more than the others? If every
+      existing Catégorie is only a loose "closest available" fit, say so rather than quietly
+      picking the least-bad one — that's exactly how a bucket like the old oversized
+      "Aventure" category happens again.
+
+   b. *Is it actually new?* Before finalizing a proposal, compare its definition against
+      every category you're about to suggest for this same game, and against the full list
+      from Step 1 — not just a quick title scan, actually reread the neighboring
+      definitions. If an existing category's definition, read fairly, already covers the
+      mechanic — even in different words — that's not a gap, that's rule 4's "two names for
+      the same thing," and the existing category is the answer, full stop. For example: a
+      stealth game whose foregrounded loop is avoiding detection and preferring discreet
+      takedowns over confrontation is already "Infiltration" (Éviter la détection ...
+      élimination discrète privilégiée à la confrontation directe) — proposing a new category
+      whose definition just restates that sentence differently is not a discovery, it's a
+      duplicate, and should never be suggested.
+
+   The bar for a genuinely new proposal is high and it should be rare: it must name a
+   mechanic or experience structurally distinct from every existing definition, not a
+   narrower or differently-worded restatement of one that already exists — "Incrémental"
+   and "Combinaisons" cleared that bar; "a Metroidvania set underwater," or any rewrite of
+   an existing definition, would not. When unsure whether the gap is real or you're just
+   being picky, lean toward the existing category and say explicitly why the fit, while
+   imperfect, is still the right one.
+
+   **Naming format, when you do propose one:** a Catégorie name is a short noun phrase —
+   one word, or at most a handful, matching the existing list's style ("Autobattler",
+   "Point & click", "Jeu de société", "Défense de tours") — **never a descriptive clause or
+   full sentence.** If the idea needs a sentence to express, that sentence belongs in the
+   Description field, not the name. A proposal titled "élimination discrète privilégiée à
+   l'affrontement direct" is malformed on its face, independent of whether the underlying
+   idea has merit — check the candidate name itself reads like every other row in the
+   Catégorie column before offering it.
+
 ## Step 4 — Answer directly
 
-For each game, give:
+For each game, give one of three kinds of answer — don't blend them into vague hedging:
 
-- The suggested Catégorie(s) — one or more.
-- A short justification (2-4 sentences), citing the specific bit of the Notion definition
-  and the specific bit of Steam-page evidence that drove the call — never a bare list of
-  names with no reasoning.
-- If something is genuinely ambiguous or information is missing (can't confirm whether a
-  deck evolves, can't find the game, two Steam listings share a name), say so explicitly
-  and ask rather than picking one arbitrarily.
+- **A confident match.** The suggested Catégorie(s) — one or more — with a short
+  justification (2-4 sentences), citing the specific bit of the Notion definition and the
+  specific bit of Steam-page evidence that drove the call. Never a bare list of names with
+  no reasoning.
+- **A new category proposal**, per rule 8 above, when nothing existing genuinely fits —
+  rare, and only after the two checks in rule 8 (real gap, not a duplicate). Explain
+  briefly why each closest existing candidate falls short, then give: a short noun-phrase
+  **name** (never a sentence), a one-line **Description** (the sentence lives here), 2-3
+  **Mots-clé**, and a candidate **Humeur** — clearly labeled as a proposal Didier would
+  need to add to Notion himself (never invent it silently into the "suggested" bucket as
+  if it already exists in his system).
+- **Genuinely ambiguous / information missing** (can't confirm whether a deck evolves,
+  can't find the game, two Steam listings share a name) — say so explicitly and ask rather
+  than picking one arbitrarily.
 
 Match Didier's own tone when he does this exercise himself: opinionated, willing to say
 "no, I don't think X fits, here's why", no hedging for the sake of politeness, and
 comfortable pushing back if an obvious-looking match doesn't actually survive the
-"is this really the foregrounded experience" test.
+"is this really the foregrounded experience" test — that same directness applies to
+saying "none of these are actually right, here's what's missing," and equally to saying
+"no, that's not a new category, X already covers it."
 
 ## A note for bulk/offline passes (not single-game lookups)
 
