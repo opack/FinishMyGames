@@ -593,8 +593,11 @@ function Invoke-SuggestCategory {
         $promptArg = "/playnite-categorize $($g.Name)"
         $stdinContent = "Tags Steam (deja recuperes par Playnite): $tags`nDescription: $desc`n`n" +
             "Termine ta réponse par exactement ces deux lignes, rien d'autre après :`n" +
-            "CATEGORIES: nom1 :: description Notion de nom1 ; nom2 :: description Notion de nom2`n" +
-            "REASONING: raisonnement sur une seule ligne"
+            "CATEGORIES: nom1 || description Notion de nom1 ## nom2 || description Notion de nom2`n" +
+            "(utilise bien ## entre deux categories et || entre nom et description - jamais de point-virgule, une description Notion peut en contenir un)`n" +
+            "REASONING: raisonnement sur une seule ligne`n`n" +
+            "Contrainte stricte sur chaque nom (nom1, nom2...) : un nom concis, un simple label (comme 'Defense de tours', 'Point & click', 'Autobattler') - jamais une phrase ni une proposition subordonnee. Toute justification va dans la description apres '::', jamais dans le nom. " +
+            "Si le nom que tu t'appretes a ecrire ressemble a une phrase descriptive, raccourcis-le en un label court avant de repondre."
 
         # Reverted the ActivateGlobalProgress wrapper - three different fixes on it
         # (typed delegate cast, $script: scope, GetNewClosure) all failed to produce
@@ -648,8 +651,12 @@ function Invoke-SuggestCategory {
         # already exist in the live Notion table.
         $catsRaw = $catLine -replace '^CATEGORIES:\s*', ''
         $suggestedList = @()
-        foreach ($entry in ($catsRaw -split '\s*;\s*' | Where-Object { $_ })) {
-            $parts = $entry -split '\s*::\s*', 2
+        # Separateurs volontairement exotiques (## entre categories, || entre nom et description) -
+        # un point-virgule ou un double-deux-points peuvent legitimement apparaitre dans une
+        # description Notion (vecu : la description d'"Infiltration" contient un ";", ce qui
+        # cassait le decoupage et faisait passer la fin de sa description pour une categorie a part).
+        foreach ($entry in ($catsRaw -split '\s*##\s*' | Where-Object { $_ })) {
+            $parts = $entry -split '\s*\|\|\s*', 2
             $name = $parts[0].Trim()
             $descr = if ($parts.Count -gt 1) { $parts[1].Trim() } else { "" }
             if ($name) { $suggestedList += [PSCustomObject]@{ Name = $name; Description = $descr } }
